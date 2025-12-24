@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mmoldabe-dev/EffectiveTask/internal/config"
+	"github.com/mmoldabe-dev/EffectiveTask/pkg/logger"
 )
 
 func main() {
@@ -11,5 +12,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("Error to load config: %s", err)
 	}
-	fmt.Println(cfg)
+	log := logger.SetupLogger(cfg.Logger.Level, "main")
+
+	log.Info("Config:", cfg)
 }
