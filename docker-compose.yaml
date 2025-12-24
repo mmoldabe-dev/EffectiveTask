@@ -1,4 +1,6 @@
-service:
+version: '3.9'
+
+services: # Было 'service'
   postgres:
     image: postgres:16-alpine
     container_name: subscriptions_db
@@ -15,5 +17,6 @@ service:
       interval: 5s 
       timeout: 5s
       retries: 5
-volume:
-  postgers_data:
+
+volumes:
+  postgres_data: 
