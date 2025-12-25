@@ -12,19 +12,19 @@ import (
 	"github.com/mmoldabe-dev/EffectiveTask/internal/service"
 )
 
-type HandlerSubcription struct {
+type HandlerSubscription struct {
 	services service.SubscriptionServiceInterface
 	log      *slog.Logger
 }
 
-func NewHandlerSubcription(services service.SubscriptionServiceInterface, log *slog.Logger) *HandlerSubcription {
-	return &HandlerSubcription{
+func NewHandlerSubscription(services service.SubscriptionServiceInterface, log *slog.Logger) *HandlerSubscription {
+	return &HandlerSubscription{
 		services: services,
 		log:      log.With(slog.String("component", "delivery/http")),
 	}
 }
 
-func (h *HandlerSubcription) SetupRouter() *http.ServeMux {
+func (h *HandlerSubscription) SetupRouter() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /subscriptions", h.createSubscription)
@@ -32,12 +32,12 @@ func (h *HandlerSubcription) SetupRouter() *http.ServeMux {
 	mux.HandleFunc("DELETE /subscriptions/{id}", h.deleteSubscription)
 	mux.HandleFunc("GET /subscriptions", h.listSubscription)
 	mux.HandleFunc("GET /subscriptions/total", h.getTotalCost)
-	mux.HandleFunc("GET /subscriptions/{id}/extend", h.extendSubscription)
+	mux.HandleFunc("PUT /subscriptions/{id}/extend", h.extendSubscription)
 
 	return mux
 }
 
-func (h *HandlerSubcription) createSubscription(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.Request) {
 	var input domain.Subscription
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -58,7 +58,7 @@ func (h *HandlerSubcription) createSubscription(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(map[string]int64{"id": id})
 }
 
-func (h *HandlerSubcription) getSubscription(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -81,7 +81,7 @@ func (h *HandlerSubcription) getSubscription(w http.ResponseWriter, r *http.Requ
 
 }
 
-func (h *HandlerSubcription) deleteSubscription(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -101,9 +101,8 @@ func (h *HandlerSubcription) deleteSubscription(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 
 }
-func (h *HandlerSubcription) listSubscription(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-
 
 	userIdStr := query.Get("user_id")
 	userID, err := uuid.Parse(userIdStr)
@@ -113,8 +112,7 @@ func (h *HandlerSubcription) listSubscription(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	
-	limit := 10 
+	limit := 10
 	if lStr := query.Get("limit"); lStr != "" {
 		if val, err := strconv.Atoi(lStr); err == nil && val > 0 {
 			limit = val
@@ -136,7 +134,6 @@ func (h *HandlerSubcription) listSubscription(w http.ResponseWriter, r *http.Req
 		maxPrice, _ = strconv.Atoi(maxStr)
 	}
 
-	
 	filter := domain.SubscriptionFilter{
 		UserID:      userID,
 		ServiceName: query.Get("service_name"),
@@ -146,7 +143,6 @@ func (h *HandlerSubcription) listSubscription(w http.ResponseWriter, r *http.Req
 		Offset:      offset,
 	}
 
-	
 	subs, err := h.services.List(r.Context(), userID, filter)
 	if err != nil {
 		h.log.Error("failed to get list", slog.String("error", err.Error()))
@@ -154,12 +150,11 @@ func (h *HandlerSubcription) listSubscription(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(subs)
 }
-func (h *HandlerSubcription) getTotalCost(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("user_id")
 	serviceName := r.URL.Query().Get("service_name")
 	fromStr := r.URL.Query().Get("from")
@@ -187,33 +182,41 @@ func (h *HandlerSubcription) getTotalCost(w http.ResponseWriter, r *http.Request
 		},
 	})
 }
-func (h *HandlerSubcription) extendSubscription(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+
+type extendRequest struct {
+	EndDate string `json:"end_date"`
+}
+
+func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		h.log.Error("invalid id parameter", slog.String("id", idStr))
-		http.Error(w, "id must be a number", http.StatusBadRequest)
+		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
-	dateStr := r.URL.Query().Get("new_date")
-	date, err := time.Parse("01-2006", dateStr)
+	var req extendRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	date, err := time.Parse("2006-01-02", req.EndDate)
 	if err != nil {
-		h.log.Error("invalid date parameter", slog.String("date", dateStr))
-		http.Error(w, "invalid date parameter", http.StatusBadRequest)
+		http.Error(w, "invalid date format (YYYY-MM-DD)", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.services.Extend(ctx, id, date); err != nil {
-		h.log.Error("failed to extend subscription", slog.Any("error", err))
+	if err := h.services.Extend(r.Context(), id, date); err != nil {
 		http.Error(w, "subscription not found", http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
-	})
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

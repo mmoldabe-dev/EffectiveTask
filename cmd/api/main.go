@@ -40,7 +40,7 @@ func main() {
 
 	repo := repository.NewSubscriptionRepository(db, log)
 	svc := service.NewSubscriptionService(repo, log)
-	handler := handler.NewHandlerSubcription(svc, log)
+	handler := handler.NewHandlerSubscription(svc, log)
 
 	router := handler.SetupRouter()
 
