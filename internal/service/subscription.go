@@ -97,19 +97,32 @@ func (s *SubscriptionService) List(ctx context.Context, userID uuid.UUID, filter
 }
 func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, fromStr, toStr string) (int64, error) {
 	const op = "service.Subscription.GetTotalCost"
-
 	layout := "01-2006"
-	from, err := time.Parse(layout, fromStr)
-	if err != nil {
-		return 0, fmt.Errorf("%s: invalid 'from' date: %w", op, err)
+
+	var from, to time.Time
+	var err error
+
+	if fromStr != "" {
+		from, err = time.Parse(layout, fromStr)
+		if err != nil {
+			return 0, fmt.Errorf("%s: %w", op, err)
+		}
+	} else {
+		from = time.Unix(0, 0)
 	}
 
-	to, err := time.Parse(layout, toStr)
-	if err != nil {
-		return 0, fmt.Errorf("%s: invalid 'to' date: %w", op, err)
+	if toStr != "" {
+		to, err = time.Parse(layout, toStr)
+		if err != nil {
+			return 0, fmt.Errorf("%s: %w", op, err)
+		}
+		to = to.AddDate(0, 1, 0).Add(-time.Second)
+	} else {
+		to = time.Now()
 	}
+
 	if to.Before(from) {
-		return 0, fmt.Errorf("%s: 'to' date cannot be before 'from' date", op)
+		return 0, fmt.Errorf("%s: invalid date range", op)
 	}
 
 	total, err := s.repo.GetTotalCost(ctx, userID, serviceName, from, to)
