@@ -1,4 +1,4 @@
-package http
+package handler
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ func (h *HandlerSubcription) SetupRouter() *http.ServeMux {
 	mux.HandleFunc("GET /subscriptions/{id}", h.getSubscription)
 	mux.HandleFunc("DELETE /subscriptions/{id}", h.deleteSubscription)
 	mux.HandleFunc("GET /subscriptions", h.listSubscription)
-	mux.HandleFunc("GET /subscriptions/total", h.listSubscription)
+	mux.HandleFunc("GET /subscriptions/total", h.getTotalCost)
 	mux.HandleFunc("GET /subscriptions/{id}/extend", h.extendSubscription)
 
 	return mux
@@ -143,6 +143,36 @@ func (h *HandlerSubcription) listSubscription(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(subs)
 }
+func (h *HandlerSubcription) getTotalCost(w http.ResponseWriter, r *http.Request) {
+    userIDStr := r.URL.Query().Get("user_id")
+    serviceName := r.URL.Query().Get("service_name")
+    fromStr := r.URL.Query().Get("from")
+    toStr := r.URL.Query().Get("to")    
+    
+  
+    userID, err := uuid.Parse(userIDStr)
+    if err != nil {
+        http.Error(w, "invalid user_id", http.StatusBadRequest)
+        return
+    }
+    
+    
+    total, err := h.services.GetTotalCost(r.Context(), userID, serviceName, fromStr, toStr)
+    if err != nil {
+        h.log.Error("failed to calculate total cost", slog.String("error", err.Error()))
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "total_cost": total,
+        "period": map[string]string{
+            "from": fromStr,
+            "to":   toStr,
+        },
+    })
+}
 func (h *HandlerSubcription) extendSubscription(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -155,7 +185,7 @@ func (h *HandlerSubcription) extendSubscription(w http.ResponseWriter, r *http.R
 	}
 
 	dateStr := r.URL.Query().Get("new_date")
-	date, err := time.Parse("2006-01-02", dateStr)
+	date, err := time.Parse("01-2006", dateStr)
 	if err != nil {
 		h.log.Error("invalid date parameter", slog.String("date", dateStr))
 		http.Error(w, "invalid date parameter", http.StatusBadRequest)
