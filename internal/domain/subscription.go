@@ -16,10 +16,26 @@ type Subscription struct {
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
 }
+
+type SubscriptionFilter struct {
+	UserID      uuid.UUID
+	ServiceName string
+	MinPrice    int
+	MaxPrice    int
+
+	Limit  int
+	Offset int
+}
+
 type CreateSubscriptionDTO struct {
-    ServiceName string `json:"service_name" validate:"required"`
-    Price       int    `json:"price" validate:"required,numeric,min=0"`
-    UserID      string `json:"user_id" validate:"required,uuid"`
-    StartDate   string `json:"start_date" validate:"required"` 
-    EndDate     string `json:"end_date"`                  
+	ServiceName string `json:"service_name" validate:"required"`
+	Price       int    `json:"price" validate:"required,min=0"`
+	UserID      string `json:"user_id" validate:"required,uuid"`
+	StartDate   string `json:"start_date" validate:"required"`
+	EndDate     string `json:"end_date"`
+}
+
+type ExtendSubscriptionDTO struct {
+	ID         int64  `json:"id" validate:"required"`
+	NewEndDate string `json:"new_end_date" validate:"required"`
 }
