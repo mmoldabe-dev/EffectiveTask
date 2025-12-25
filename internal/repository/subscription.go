@@ -16,7 +16,7 @@ type SubscriptionInterface interface {
 	GetByID(ctx context.Context, id int64) (*domain.Subscription, error)
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
-	GetTotalCost(ctx context.Context, userID uuid.UUID, from, to time.Time) (int64, error)
+	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) (int64, error)
 	Exists(ctx context.Context, userID uuid.UUID, serviceName string) (bool, error)
 	Extend(ctx context.Context, id int64, newEndDate time.Time) error
 }
@@ -25,6 +25,8 @@ type SubscriptionRepository struct {
 	db  *sql.DB
 	log *slog.Logger
 }
+
+var _ SubscriptionInterface = (*SubscriptionRepository)(nil)
 
 func NewSubscriptionRepository(db *sql.DB, log *slog.Logger) *SubscriptionRepository {
 	return &SubscriptionRepository{
@@ -168,7 +170,8 @@ func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, fil
 
 	return subs, nil
 }
-//подсчета суммарной стоимости всех подписок за период 
+
+// подсчета суммарной стоимости всех подписок за период
 func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) (int64, error) {
 	const op = "repository.postgres.GetTotalCost"
 
@@ -197,7 +200,8 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.U
 	return total, nil
 
 }
-//Проверка на exists
+
+// Проверка на exists
 func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, serviceName string) (bool, error) {
 	const op = "repository.postgres.Exists"
 	query := `select exists(
@@ -217,7 +221,7 @@ func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, s
 	return exists, nil
 }
 
-//Продление подписки
+// Продление подписки
 func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDate time.Time) error {
 	const op = "repository.postgres.Extend"
 
@@ -228,8 +232,8 @@ func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDat
 
 	res, err := r.db.ExecContext(ctx, query, newEndDate, id)
 	if err != nil {
-		r.log.Error("failed to extend subscription", 
-			slog.String("op", op), 
+		r.log.Error("failed to extend subscription",
+			slog.String("op", op),
 			slog.String("error", err.Error()),
 		)
 		return fmt.Errorf("%s: %w", op, err)
