@@ -136,14 +136,24 @@ func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID
 func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDate time.Time) error {
 	const op = "service.Subscription.Extend"
 
-	if newEndDate.Before(time.Now()) {
-		return fmt.Errorf("%s: cannot extend to a past date", op)
-	}
-
-	err := s.repo.Extend(ctx, id, newEndDate)
+	sub, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return fmt.Errorf("%s: subscription not found: %w", op, err)
 	}
 
-	return nil
+	startDate, _ := time.Parse("01-2006", sub.StartDate)
+    if newEndDate.Before(startDate) {
+        return fmt.Errorf("%s: new end date cannot be before start date", op)
+    }
+
+    if newEndDate.Before(time.Now().Truncate(24 * time.Hour)) {
+         return fmt.Errorf("%s: cannot extend to a past date", op)
+    }
+
+    err = s.repo.Extend(ctx, id, newEndDate)
+    if err != nil {
+        return fmt.Errorf("%s: %w", op, err)
+    }
+
+    return nil
 }

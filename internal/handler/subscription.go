@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -43,6 +44,18 @@ func isInvalidDate(dateStr string) bool {
 	}
 	_, err := time.Parse("01-2006", dateStr)
 	return err != nil
+}
+func parseID(idStr string) (int64, error) {
+	if idStr == "" || strings.ContainsAny(idStr, "/.\\-+") {
+		return 0, fmt.Errorf("invalid id format")
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, fmt.Errorf("id must be positive integer")
+	}
+
+	return id, nil
 }
 func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.Request) {
 	var input domain.Subscription
@@ -87,7 +100,7 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 
 func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := parseID(idStr)
 	if err != nil || id <= 0 {
 		h.log.Error("invalid id parameter", slog.String("id", idStr))
 		http.Error(w, "id must be a number", http.StatusBadRequest)
@@ -107,7 +120,7 @@ func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Req
 
 func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := parseID(idStr)
 	if err != nil || id <= 0 {
 		h.log.Error("invalid id parameter", slog.String("id", idStr))
 		http.Error(w, "id must be a number", http.StatusBadRequest)
@@ -212,14 +225,10 @@ func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-type extendRequest struct {
-	EndDate string `json:"end_date"`
-}
-
 func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := parseID(idStr)
 	if err != nil || id <= 0 {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
