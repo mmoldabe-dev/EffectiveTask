@@ -119,28 +119,43 @@ func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, fil
 
 	// Базовый запрос
 	query := `SELECT id, service_name, price, user_id, start_date, end_date, created_at, updated_at 
-				FROM subscriptions 
-				WHERE user_id = $1`
+                FROM subscriptions 
+                WHERE user_id = $1`
 
-	// список аргументов
 	args := []interface{}{userID}
-	//некст аргумент
 	argID := 2
 
-	//проверка есть ли фильтр на название
+	// 1. Поиск по названию
 	if filter.ServiceName != "" {
 		query += fmt.Sprintf(" AND service_name ILIKE $%d", argID)
 		args = append(args, "%"+filter.ServiceName+"%")
 		argID++
 	}
 
-	//лимит
-	if filter.Limit > 0 {
-		query += fmt.Sprintf(" LIMIT $%d", argID)
-		args = append(args, filter.Limit)
+	// по минимальной цене
+	if filter.MinPrice > 0 {
+		query += fmt.Sprintf(" AND price >= $%d", argID)
+		args = append(args, filter.MinPrice)
 		argID++
 	}
-	//офсет
+
+	// по максимальной цене
+	if filter.MaxPrice > 0 {
+		query += fmt.Sprintf(" AND price <= $%d", argID)
+		args = append(args, filter.MaxPrice)
+		argID++
+	}
+
+	//  Лимит 
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	query += fmt.Sprintf(" LIMIT $%d", argID)
+	args = append(args, limit)
+	argID++
+
+	//Офсет
 	if filter.Offset > 0 {
 		query += fmt.Sprintf(" OFFSET $%d", argID)
 		args = append(args, filter.Offset)

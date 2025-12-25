@@ -81,8 +81,11 @@ func (s *SubscriptionService) Delete(ctx context.Context, id int64) error {
 func (s *SubscriptionService) List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error) {
 	const op = "service.Subscription.List"
 
-	if filter.Limit > 100 {
+	if filter.Limit > 100 || filter.Limit <= 0 {
 		filter.Limit = 100
+	}
+	if filter.MinPrice > 0 && filter.MaxPrice > 0 && filter.MinPrice > filter.MaxPrice {
+		return nil, fmt.Errorf("minimum price cannot be greater than maximum price")
 	}
 
 	subs, err := s.repo.List(ctx, userID, filter)

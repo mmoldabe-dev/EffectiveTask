@@ -102,76 +102,90 @@ func (h *HandlerSubcription) deleteSubscription(w http.ResponseWriter, r *http.R
 
 }
 func (h *HandlerSubcription) listSubscription(w http.ResponseWriter, r *http.Request) {
-
 	query := r.URL.Query()
+
 
 	userIdStr := query.Get("user_id")
 	userID, err := uuid.Parse(userIdStr)
+	if err != nil {
+		h.log.Error("invalid user_id", slog.String("val", userIdStr))
+		http.Error(w, "invalid user_id (UUID expected)", http.StatusBadRequest)
+		return
+	}
 
+	
+	limit := 10 
+	if lStr := query.Get("limit"); lStr != "" {
+		if val, err := strconv.Atoi(lStr); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	offset := 0
+	if oStr := query.Get("offset"); oStr != "" {
+		if val, err := strconv.Atoi(oStr); err == nil && val >= 0 {
+			offset = val
+		}
+	}
+
+	var minPrice, maxPrice int
+	if minStr := query.Get("min_price"); minStr != "" {
+		minPrice, _ = strconv.Atoi(minStr)
+	}
+	if maxStr := query.Get("max_price"); maxStr != "" {
+		maxPrice, _ = strconv.Atoi(maxStr)
+	}
+
+	
+	filter := domain.SubscriptionFilter{
+		UserID:      userID,
+		ServiceName: query.Get("service_name"),
+		MinPrice:    minPrice,
+		MaxPrice:    maxPrice,
+		Limit:       limit,
+		Offset:      offset,
+	}
+
+	
+	subs, err := h.services.List(r.Context(), userID, filter)
+	if err != nil {
+		h.log.Error("failed to get list", slog.String("error", err.Error()))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(subs)
+}
+func (h *HandlerSubcription) getTotalCost(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.URL.Query().Get("user_id")
+	serviceName := r.URL.Query().Get("service_name")
+	fromStr := r.URL.Query().Get("from")
+	toStr := r.URL.Query().Get("to")
+
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		http.Error(w, "invalid user_id", http.StatusBadRequest)
 		return
 	}
 
-	limitStr := query.Get("limit")
-	limit, err := strconv.Atoi(limitStr)
+	total, err := h.services.GetTotalCost(r.Context(), userID, serviceName, fromStr, toStr)
 	if err != nil {
-		http.Error(w, "faielt  conv limit", http.StatusBadRequest)
-		return
-	}
-	offsetStr := query.Get("offset")
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil {
-		http.Error(w, "faielt  conv offset", http.StatusBadRequest)
+		h.log.Error("failed to calculate total cost", slog.String("error", err.Error()))
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	filter := domain.SubscriptionFilter{
-		UserID: userID,
-		Limit:  limit,
-		Offset: offset,
-	}
-
-	subs, err := h.services.List(r.Context(), userID, filter)
-	if err != nil {
-		h.log.Error("failed to  get List subscriptions ", slog.String("error", err.Error()))
-		http.Error(w, "error", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "applictaion/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(subs)
-}
-func (h *HandlerSubcription) getTotalCost(w http.ResponseWriter, r *http.Request) {
-    userIDStr := r.URL.Query().Get("user_id")
-    serviceName := r.URL.Query().Get("service_name")
-    fromStr := r.URL.Query().Get("from")
-    toStr := r.URL.Query().Get("to")    
-    
-  
-    userID, err := uuid.Parse(userIDStr)
-    if err != nil {
-        http.Error(w, "invalid user_id", http.StatusBadRequest)
-        return
-    }
-    
-    
-    total, err := h.services.GetTotalCost(r.Context(), userID, serviceName, fromStr, toStr)
-    if err != nil {
-        h.log.Error("failed to calculate total cost", slog.String("error", err.Error()))
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
-    
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]interface{}{
-        "total_cost": total,
-        "period": map[string]string{
-            "from": fromStr,
-            "to":   toStr,
-        },
-    })
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"total_cost": total,
+		"period": map[string]string{
+			"from": fromStr,
+			"to":   toStr,
+		},
+	})
 }
 func (h *HandlerSubcription) extendSubscription(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
