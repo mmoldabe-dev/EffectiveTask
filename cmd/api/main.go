@@ -27,6 +27,10 @@ func main() {
 
 	log := logger.SetupLogger(cfg.Logger.Level, "effective_task")
 
+	if err := postgres.RunMigrations(cfg, log); err != nil {
+		log.Error("migration failed", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
 	db, err := postgres.NewPostgres(cfg, log)
 	if err != nil {
 		log.Error("could not initialize database storage")
