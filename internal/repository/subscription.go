@@ -36,7 +36,7 @@ func NewSubscriptionRepository(db *sql.DB, log *slog.Logger) *SubscriptionReposi
 // Запись подписки
 func (r *SubscriptionRepository) Create(ctx context.Context, sub domain.Subscription) (int64, error) {
 	const op = "repository.postgres.Create"
-	query := `INSERT INTO subscriptions(service_name, price, user_id, start_date, end_date), VALUES($1, $2, $3, $4,$5)
+	query := `INSERT INTO subscriptions(service_name, price, user_id, start_date, end_date)	 VALUES($1, $2, $3, $4,$5)
 	RETURNING id
 	`
 	var id int64
@@ -153,7 +153,7 @@ func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, fil
 	}
 	defer rows.Close()
 	//запись данных
-	var subs []domain.Subscription
+	subs := make([]domain.Subscription, 0)
 	for rows.Next() {
 		var sub domain.Subscription
 		err := rows.Scan(
@@ -201,7 +201,7 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.U
 func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, serviceName string) (bool, error) {
 	const op = "repository.postgres.Exists"
 	query := `select exists(
-		select 1 form subscriptions where user_id = $1 and service_name =$2 and(end_date IS NULL OR end_date > NOW()) 
+		select 1 from subscriptions where user_id = $1 and service_name =$2 and(end_date IS NULL OR end_date > NOW()) 
 	)`
 
 	var exists bool
