@@ -11,8 +11,8 @@ type Subscription struct {
 	ServiceName string     `json:"service_name" db:"service_name"`
 	Price       int        `json:"price" db:"price"`
 	UserID      uuid.UUID  `json:"user_id" db:"user_id"`
-	StartDate   time.Time  `json:"start_date" db:"start_date"`
-	EndDate     *time.Time `json:"end_date" db:"end_date"`
+	StartDate   string  `json:"start_date" db:"start_date"`
+	EndDate     *string `json:"end_date,omitempty" db:"end_date"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
 }
@@ -27,15 +27,4 @@ type SubscriptionFilter struct {
 	Offset int
 }
 
-type CreateSubscriptionDTO struct {
-	ServiceName string `json:"service_name" validate:"required"`
-	Price       int    `json:"price" validate:"required,min=0"`
-	UserID      string `json:"user_id" validate:"required,uuid"`
-	StartDate   string `json:"start_date" validate:"required"`
-	EndDate     string `json:"end_date"`
-}
 
-type ExtendSubscriptionDTO struct {
-	ID         int64  `json:"id" validate:"required"`
-	NewEndDate string `json:"new_end_date" validate:"required"`
-}
