@@ -205,7 +205,7 @@ func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Re
 			limit = val
 		}
 	}
-	
+
 	if limit > 200 {
 		http.Error(w, "limit too big", 400)
 		return

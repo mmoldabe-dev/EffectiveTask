@@ -56,7 +56,6 @@ func LoadConfig() (*Config, error) {
 			Format: getEnv("LOG_FORMAT", "text"),
 		},
 	}, nil
-
 }
 
 func getEnv(key, defaultValue string) string {

@@ -13,7 +13,8 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/mmoldabe-dev/EffectiveTask/internal/config"
 )
-//подключение к бд 
+
+// подключение к бд
 func NewPostgres(cfg *config.Config, log *slog.Logger) (*sql.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Password,
@@ -42,7 +43,8 @@ func NewPostgres(cfg *config.Config, log *slog.Logger) (*sql.DB, error) {
 
 	return db, nil
 }
-//миграция бд
+
+// миграция бд
 func RunMigrations(cfg *config.Config, log *slog.Logger) error {
 	const op = "storage. RunMigrations"
 

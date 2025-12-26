@@ -68,7 +68,6 @@ func (r *SubscriptionRepository) GetByID(ctx context.Context, id int64) (*domain
 		&sub.CreatedAt,
 		&sub.UpdatedAt,
 	)
-
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("%s: subscription not found: %w", op, err)

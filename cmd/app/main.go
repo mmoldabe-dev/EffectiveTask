@@ -22,8 +22,8 @@ import (
 //@version 1.0
 //@description The test task for "effective mobile"
 
-//host@ localhost:8080
-//basePath /
+// host@ localhost:8080
+// basePath /
 func main() {
 	// грузим конфиг
 	cfg, err := config.LoadConfig()
