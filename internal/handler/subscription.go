@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mmoldabe-dev/EffectiveTask/internal/domain"
+	"github.com/mmoldabe-dev/EffectiveTask/internal/middleware"
 	"github.com/mmoldabe-dev/EffectiveTask/internal/service"
 )
 
@@ -36,6 +37,11 @@ func (h *HandlerSubscription) SetupRouter() *http.ServeMux {
 	mux.HandleFunc("GET /subscriptions", h.listSubscription)
 	mux.HandleFunc("GET /subscriptions/total", h.getTotalCost)
 	mux.HandleFunc("PUT /subscriptions/{id}/extend", h.extendSubscription)
+
+	var handler http.Handler = mux
+	handler = middleware.JSONMiddleware(handler)
+	handler = middleware.LogginMiddleware(h.log)(handler)
+	handler = middleware.RecoverMiddleware(h.log)(handler)
 
 	return mux
 }
