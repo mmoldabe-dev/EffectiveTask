@@ -101,38 +101,43 @@ func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID
 	const op = "service.Subscription.GetTotalCost"
 	layout := "01-2006"
 
-	var from, to time.Time
-	var err error
-
-	if fromStr != "" {
-		from, err = time.Parse(layout, fromStr)
-		if err != nil {
-			return 0, fmt.Errorf("%s: %w", op, err)
-		}
-	} else {
-		from = time.Unix(0, 0)
+	reqFrom, err := time.Parse(layout, fromStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid from date")
+	}
+	reqTo, err := time.Parse(layout, toStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid to date")
 	}
 
-	if toStr != "" {
-		to, err = time.Parse(layout, toStr)
-		if err != nil {
-			return 0, fmt.Errorf("%s: %w", op, err)
-		}
-		to = to.AddDate(0, 1, 0).Add(-time.Second)
-	} else {
-		to = time.Now()
-	}
-
-	if to.Before(from) {
-		return 0, fmt.Errorf("%s: invalid date range", op)
-	}
-
-	total, err := s.repo.GetTotalCost(ctx, userID, serviceName, from, to)
+	subs, err := s.repo.GetTotalCost(ctx, userID, serviceName, reqFrom, reqTo)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return total, nil
+	var totalCost int64
+
+	for _, sub := range subs {
+		subStart, _ := time.Parse(layout, sub.StartDate)
+
+		var subEnd time.Time
+		if sub.EndDate != nil {
+			subEnd, _ = time.Parse(layout, *sub.EndDate)
+		} else {
+			subEnd = reqTo
+		}
+
+		intersectStart := maxDate(reqFrom, subStart)
+		intersectEnd := minDate(reqTo, subEnd)
+
+		months := countMonths(intersectStart, intersectEnd)
+
+		if months > 0 {
+			totalCost += int64(sub.Price) * int64(months)
+		}
+	}
+
+	return totalCost, nil
 }
 
 var monthYearRegex = regexp.MustCompile(`^(0[1-9]|1[0-2])-\d{4}$`)

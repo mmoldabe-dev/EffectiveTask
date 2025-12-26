@@ -16,7 +16,7 @@ type SubscriptionInterface interface {
 	GetByID(ctx context.Context, id int64) (*domain.Subscription, error)
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
-	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) (int64, error)
+	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) ([]domain.Subscription, error)
 	Exists(ctx context.Context, userID uuid.UUID, serviceName string) (bool, error)
 	Extend(ctx context.Context, id int64, newEndDate string, newPrice int) error
 }
@@ -175,33 +175,37 @@ func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, fil
 }
 
 // подсчета суммарной стоимости всех подписок за период
-func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) (int64, error) {
-	const op = "repository.postgres.GetTotalCost"
+func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) ([]domain.Subscription, error) {
+	const op = "repository.postgres.GetForPeriod"
 
 	query := `
-SELECT COALESCE(SUM(price), 0) 
-FROM subscriptions 
-WHERE user_id = $1 
-  AND TO_DATE(start_date, 'MM-YYYY') <= $3 
-  AND (end_date IS NULL OR TO_DATE(end_date, 'MM-YYYY') >= $2)`
+        SELECT price, start_date, end_date 
+        FROM subscriptions 
+        WHERE user_id = $1 
+          AND TO_DATE(start_date, 'MM-YYYY') <= $3
+          AND (end_date IS NULL OR TO_DATE(end_date, 'MM-YYYY') >= $2)`
 
 	args := []interface{}{userID, from, to}
-	argID := 4
-
 	if serviceName != "" {
-		query += fmt.Sprintf(" AND service_name = $%d", argID)
+		query += " AND service_name = $4"
 		args = append(args, serviceName)
 	}
-	var total int64
 
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(&total)
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-
-		r.log.Error("failed to calculate total cost", slog.String("op:", op), slog.String("error", err.Error()))
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
-	return total, nil
+	defer rows.Close()
 
+	var subs []domain.Subscription
+	for rows.Next() {
+		var s domain.Subscription
+		if err := rows.Scan(&s.Price, &s.StartDate, &s.EndDate); err != nil {
+			return nil, err
+		}
+		subs = append(subs, s)
+	}
+	return subs, nil
 }
 
 // Проверка на exists
