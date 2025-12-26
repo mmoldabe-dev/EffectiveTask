@@ -26,32 +26,33 @@ REST API для управления подписками пользовател
 
 1. Клонируем репозиторий и переходим в директорию:
 
+```bash
+git clone https://github.com/mmoldabe-dev/EffectiveTask
+cd EffectiveTask
+```
 
-``` git clone <https://github.com/mmoldabe-dev/EffectiveTask>```
+2. Копируем и настраиваем .env:
 
-```cd EffectiveTask```
+```bash
+cp .env.example .env
+# редактируем .env под себя
+```
 
+3. Поднимаем все контейнеры:
 
-# Копируем и настраиваем .env:
+```bash
+make up
+```
 
-``cp .env.example .env
-``
+Сервис будет доступен по адресу: **http://localhost:8080**
 
-редактируем .env под себя
+Swagger UI: **http://localhost:8080/swagger/index.html**
 
+---
 
-**Поднимаем все контейнеры:**
+## Примеры использования
 
-*make up*
-Сервис будет доступен по адресу: http://localhost:8080
-
-Swagger UI: http://localhost:8080/swagger/index.html
-
-**Примеры использования**
-
-
-*Создать подписку:*
-
+### *Создать подписку*
 
 ```bash
 curl -X POST http://localhost:8080/subscriptions \
@@ -62,22 +63,95 @@ curl -X POST http://localhost:8080/subscriptions \
     "user_id": "550e8400-e29b-41d4-a716-446655440000",
     "start_date": "01-2026",
     "end_date": "12-2026"
-  }'```
-*Посмотреть все подписки пользователя:*
-
-```bash
-
-curl "http://localhost:8080/subscriptions?user_id=550e8400-e29b-41d4-a716-446655440000"
-
+  }'
 ```
-*Посчитать расходы за период:*
-```bash
 
+**Ответ:**
+```json
+{
+  "id": 1
+}
+```
+
+---
+
+### *Получить подписку по ID*
+
+```bash
+curl http://localhost:8080/subscriptions/1
+```
+
+**Ответ:**
+```json
+{
+  "id": 1,
+  "service_name": "Spotify Premium",
+  "price": 500,
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "start_date": "01-2026",
+  "end_date": "12-2026"
+}
+```
+
+---
+
+### *Посмотреть все подписки пользователя*
+
+```bash
+curl "http://localhost:8080/subscriptions?user_id=550e8400-e29b-41d4-a716-446655440000"
+```
+
+**С фильтрами:**
+```bash
+curl "http://localhost:8080/subscriptions?user_id=550e8400-e29b-41d4-a716-446655440000&service_name=Spotify&min_price=100&max_price=1000&limit=10&offset=0"
+```
+
+**Ответ:**
+```json
+[
+  {
+    "id": 1,
+    "service_name": "Spotify Premium",
+    "price": 500,
+    "user_id": "550e8400-e29b-41d4-a716-446655440000",
+    "start_date": "01-2026",
+    "end_date": "12-2026"
+  }
+]
+```
+
+---
+
+### *Посчитать расходы за период*
+
+```bash
 curl "http://localhost:8080/subscriptions/total?user_id=550e8400-e29b-41d4-a716-446655440000&from=01-2026&to=12-2026"
 ```
-*Продлить подписку:*
-```bash
 
+**С фильтром по сервису:**
+```bash
+curl "http://localhost:8080/subscriptions/total?user_id=550e8400-e29b-41d4-a716-446655440000&from=01-2026&to=12-2026&service_name=Spotify Premium"
+```
+
+**Ответ:**
+```json
+{
+  "total_cost": 6000,
+  "details": [
+    "Spotify Premium: 6000"
+  ],
+  "period": {
+    "from": "01-2026",
+    "to": "12-2026"
+  }
+}
+```
+
+---
+
+### *Продлить подписку*
+
+```bash
 curl -X PUT http://localhost:8080/subscriptions/1/extend \
   -H "Content-Type: application/json" \
   -d '{
@@ -85,51 +159,85 @@ curl -X PUT http://localhost:8080/subscriptions/1/extend \
     "price": 600
   }'
 ```
-**Структура проекта**
-```bash
 
-cmd/app/          # Точка входа
-internal/
-  handler/        # HTTP handlers
-  service/        # Бизнес-логика
-  repository/     # Работа с БД
-  domain/         # Модели данных
-  middleware/     # HTTP middleware
-migrations/       # SQL миграции
-docs/             # Swagger документация
+**Ответ:**
+```json
+{
+  "status": "success"
+}
 ```
-**Архитектура**
-Классическая слоеная архитектура: Handler → Service → Repository → PostgreSQL
+
+---
+
+### *Удалить подписку*
+
+```bash
+curl -X DELETE http://localhost:8080/subscriptions/1
+```
+
+**Ответ:**
+```json
+{
+  "status": "deleted"
+}
+```
+
+---
+
+## Структура проекта
+
+```
+├── cmd/app/          # Точка входа
+├── internal/
+│   ├── handler/      # HTTP handlers
+│   ├── service/      # Бизнес-логика
+│   ├── repository/   # Работа с БД
+│   ├── domain/       # Модели данных
+│   └── middleware/   # HTTP middleware
+├── migrations/       # SQL миграции
+└── docs/             # Swagger документация
+```
+
+---
+
+## Архитектура
+
+Классическая слоеная архитектура:
+
+**Handler → Service → Repository → PostgreSQL**
 
 Каждый слой занимается своей задачей и не вмешивается в логику других слоев.
 
-**Технологии**
-Go 1.23 — основной язык
+---
 
-PostgreSQL 16 — база данных
+## Технологии
 
-Docker & Docker Compose — контейнеризация
+- **Go 1.23** — основной язык
+- **PostgreSQL 16** — база данных
+- **Docker & Docker Compose** — контейнеризация
+- **golang-migrate** — миграции БД
+- **slog** — структурированное логирование
+- **Swagger** — документация API
 
-golang-migrate — миграции БД
+---
 
-slog — структурированное логирование
+## Полезные команды
 
-Swagger — документация API
-
-**Полезные команды**
 ```bash
-
 make up       # Запустить все в Docker
 make down     # Остановить контейнеры
 make run      # Запустить локально (нужна БД)
 make swag     # Обновить Swagger документацию
 ```
 
+---
 
-**Переменные окружения**
+## Переменные окружения
 
+Основные настройки в `.env`:
 
-```bash DB_HOST=localhost
+```env
+DB_HOST=localhost
 DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=postgres
@@ -140,14 +248,29 @@ SERVER_PORT=8080
 LOG_LEVEL=debug
 ```
 
-**Особенности**
+---
 
-- Даты хранятся в формате MM-YYYY (месяц-год)
+## API Endpoints
 
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| POST | `/subscriptions` | Создать подписку |
+| GET | `/subscriptions/{id}` | Получить подписку по ID |
+| DELETE | `/subscriptions/{id}` | Удалить подписку |
+| GET | `/subscriptions` | Список подписок с фильтрами |
+| GET | `/subscriptions/total` | Посчитать расходы за период |
+| PUT | `/subscriptions/{id}/extend` | Продлить подписку |
+
+---
+
+## Особенности
+
+- Даты хранятся в формате **MM-YYYY** (месяц-год)
 - Цены только в рублях, без копеек
-
-- Подписка без end_date считается активной бессрочно
-
+- Подписка без `end_date` считается активной бессрочно
 - Один пользователь не может иметь две активные подписки на один сервис
-
 - Нельзя продлить подписку в прошлое
+- При расчете расходов за будущий период выдается предупреждение
+
+---
+
