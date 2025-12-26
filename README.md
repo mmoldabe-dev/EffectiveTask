@@ -26,28 +26,27 @@ REST API для управления подписками пользовател
 
 1. Клонируем репозиторий и переходим в директорию:
 
-```bash
+
 git clone <repo>
 cd EffectiveTask
 Копируем и настраиваем .env:
 
-bash
-Копировать код
+
+**Копировать код**
 cp .env.example .env
+
 # редактируем .env под себя
 Поднимаем все контейнеры:
 
-bash
-Копировать код
-make up
+*make up*
 Сервис будет доступен по адресу: http://localhost:8080
 Swagger UI: http://localhost:8080/swagger/index.html
 
-Примеры использования
-Создать подписку:
+**Примеры использования**
+*Создать подписку:*
 
-bash
-Копировать код
+
+```bash
 curl -X POST http://localhost:8080/subscriptions \
   -H "Content-Type: application/json" \
   -d '{
@@ -56,30 +55,32 @@ curl -X POST http://localhost:8080/subscriptions \
     "user_id": "550e8400-e29b-41d4-a716-446655440000",
     "start_date": "01-2026",
     "end_date": "12-2026"
-  }'
-Посмотреть все подписки пользователя:
+  }'```
+*Посмотреть все подписки пользователя:*
 
-bash
-Копировать код
+```bash
+
 curl "http://localhost:8080/subscriptions?user_id=550e8400-e29b-41d4-a716-446655440000"
-Посчитать расходы за период:
 
-bash
-Копировать код
+```
+*Посчитать расходы за период:*
+```bash
+
 curl "http://localhost:8080/subscriptions/total?user_id=550e8400-e29b-41d4-a716-446655440000&from=01-2026&to=12-2026"
-Продлить подписку:
+```
+*Продлить подписку:*
+```bash
 
-bash
-Копировать код
 curl -X PUT http://localhost:8080/subscriptions/1/extend \
   -H "Content-Type: application/json" \
   -d '{
     "end_date": "12-2027",
     "price": 600
   }'
-Структура проекта
-bash
-Копировать код
+```
+**Структура проекта**
+```bash
+
 cmd/app/          # Точка входа
 internal/
   handler/        # HTTP handlers
@@ -89,12 +90,13 @@ internal/
   middleware/     # HTTP middleware
 migrations/       # SQL миграции
 docs/             # Swagger документация
-Архитектура
+```
+**Архитектура**
 Классическая слоеная архитектура: Handler → Service → Repository → PostgreSQL
 
 Каждый слой занимается своей задачей и не вмешивается в логику других слоев.
 
-Технологии
+**Технологии**
 Go 1.23 — основной язык
 
 PostgreSQL 16 — база данных
@@ -107,7 +109,7 @@ slog — структурированное логирование
 
 Swagger — документация API
 
-Полезные команды
+**Полезные команды**
 bash
 Копировать код
 make up       # Запустить все в Docker
@@ -126,7 +128,9 @@ DB_SSL_MODE=disable
 
 SERVER_PORT=8080
 LOG_LEVEL=debug
-Особенности
+
+**Особенности**
+
 Даты хранятся в формате MM-YYYY (месяц-год)
 
 Цены только в рублях, без копеек
