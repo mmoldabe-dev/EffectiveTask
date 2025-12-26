@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -36,9 +35,7 @@ type LoggerConfig struct {
 }
 
 func LoadConfig() (*Config, error) {
-	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("No .env file found, using system environment variables")
-	}
+	_ = godotenv.Load()
 
 	return &Config{
 		Database: DatabaseConfig{
@@ -47,7 +44,7 @@ func LoadConfig() (*Config, error) {
 			User:     getEnv("DB_USER", "postgres"),
 			Password: getEnv("DB_PASSWORD", "postgres"),
 			DBName:   getEnv("DB_NAME", "subscription_db"),
-			SSLMode:  getEnv("DB_SSL_MODE", "disable"), 
+			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 		},
 		Server: ServerConfig{
 			Port:         getEnv("SERVER_PORT", "8080"),

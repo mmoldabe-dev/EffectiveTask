@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -11,6 +12,8 @@ import (
 	"github.com/mmoldabe-dev/EffectiveTask/internal/domain"
 	"github.com/mmoldabe-dev/EffectiveTask/internal/repository"
 )
+
+var ErrSubscriptionExists = errors.New("subscription already exists")
 
 type SubscriptionServiceInterface interface {
 	Create(ctx context.Context, sub domain.Subscription) (int64, error)
@@ -47,6 +50,9 @@ func (s *SubscriptionService) Create(ctx context.Context, sub domain.Subscriptio
 		return 0, fmt.Errorf("%s, %w", op, err)
 	}
 	if exists {
+		return 0, ErrSubscriptionExists
+	}
+	if exists {
 		return 0, fmt.Errorf("%s, such a subscription already exists", op)
 	}
 	id, err := s.repo.Create(ctx, sub)
@@ -81,7 +87,6 @@ func (s *SubscriptionService) Delete(ctx context.Context, id int64) error {
 }
 func (s *SubscriptionService) List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error) {
 	const op = "service.Subscription.List"
-
 
 	if filter.MinPrice > 0 && filter.MaxPrice > 0 && filter.MinPrice > filter.MaxPrice {
 		return nil, fmt.Errorf("minimum price cannot be greater than maximum price")

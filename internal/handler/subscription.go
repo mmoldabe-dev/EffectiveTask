@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -80,7 +81,7 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-
+	
 	if input.UserID == uuid.Nil {
 		http.Error(w, "user_id is required", http.StatusBadRequest)
 		return
@@ -108,6 +109,10 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 	}
 	id, err := h.services.Create(r.Context(), input)
 	if err != nil {
+		if errors.Is(err, service.ErrSubscriptionExists) {
+			http.Error(w, err.Error(), http.StatusConflict) 
+			return
+		}
 		h.log.Error("failed to create subscription", slog.String("error", err.Error()))
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
