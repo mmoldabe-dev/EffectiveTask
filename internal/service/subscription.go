@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +18,7 @@ type SubscriptionServiceInterface interface {
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
 	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, fromStr, toStr string) (int64, error)
-	Extend(ctx context.Context, id int64, newEndDate time.Time) error
+	Extend(ctx context.Context, id int64, newEndDateStr string) error
 }
 
 type SubscriptionService struct {
@@ -81,9 +82,7 @@ func (s *SubscriptionService) Delete(ctx context.Context, id int64) error {
 func (s *SubscriptionService) List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error) {
 	const op = "service.Subscription.List"
 
-	if filter.Limit > 100 || filter.Limit <= 0 {
-		filter.Limit = 100
-	}
+
 	if filter.MinPrice > 0 && filter.MaxPrice > 0 && filter.MinPrice > filter.MaxPrice {
 		return nil, fmt.Errorf("minimum price cannot be greater than maximum price")
 	}
@@ -133,8 +132,14 @@ func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID
 	return total, nil
 }
 
-func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDate time.Time) error {
+var monthYearRegex = regexp.MustCompile(`^(0[1-9]|1[0-2])-\d{4}$`)
+
+func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDateStr string) error {
 	const op = "service.Subscription.Extend"
+
+	if !monthYearRegex.MatchString(newEndDateStr) {
+		return fmt.Errorf("%s: invalid date format", op)
+	}
 
 	sub, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -142,18 +147,20 @@ func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDate t
 	}
 
 	startDate, _ := time.Parse("01-2006", sub.StartDate)
-    if newEndDate.Before(startDate) {
-        return fmt.Errorf("%s: new end date cannot be before start date", op)
-    }
+	newEndDate, _ := time.Parse("01-2006", newEndDateStr)
 
-    if newEndDate.Before(time.Now().Truncate(24 * time.Hour)) {
-         return fmt.Errorf("%s: cannot extend to a past date", op)
-    }
+	if newEndDate.Before(startDate) {
+		return fmt.Errorf("%s: new end date cannot be before start date", op)
+	}
 
-    err = s.repo.Extend(ctx, id, newEndDate)
-    if err != nil {
-        return fmt.Errorf("%s: %w", op, err)
-    }
+	if newEndDate.Before(time.Now().Truncate(24 * time.Hour)) {
+		return fmt.Errorf("%s: cannot extend to a past date", op)
+	}
 
-    return nil
+	err = s.repo.Extend(ctx, id, newEndDateStr)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }

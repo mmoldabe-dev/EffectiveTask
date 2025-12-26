@@ -18,7 +18,7 @@ type SubscriptionInterface interface {
 	List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
 	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) (int64, error)
 	Exists(ctx context.Context, userID uuid.UUID, serviceName string) (bool, error)
-	Extend(ctx context.Context, id int64, newEndDate time.Time) error
+	Extend(ctx context.Context, id int64, newEndDate string) error
 }
 
 type SubscriptionRepository struct {
@@ -117,60 +117,48 @@ func (r *SubscriptionRepository) Delete(ctx context.Context, id int64) error {
 func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error) {
 	const op = "repository.postgres.List"
 
-	// Базовый запрос
 	query := `SELECT id, service_name, price, user_id, start_date, end_date, created_at, updated_at 
-                FROM subscriptions 
-                WHERE user_id = $1`
+              FROM subscriptions 
+              WHERE user_id = $1`
 
 	args := []interface{}{userID}
-	argID := 2
 
-	// 1. Поиск по названию
 	if filter.ServiceName != "" {
-		query += fmt.Sprintf(" AND service_name ILIKE $%d", argID)
 		args = append(args, "%"+filter.ServiceName+"%")
-		argID++
+		query += fmt.Sprintf(" AND service_name ILIKE $%d", len(args))
 	}
 
-	// по минимальной цене
 	if filter.MinPrice > 0 {
-		query += fmt.Sprintf(" AND price >= $%d", argID)
 		args = append(args, filter.MinPrice)
-		argID++
+		query += fmt.Sprintf(" AND price >= $%d", len(args))
 	}
 
-	// по максимальной цене
 	if filter.MaxPrice > 0 {
-		query += fmt.Sprintf(" AND price <= $%d", argID)
 		args = append(args, filter.MaxPrice)
-		argID++
+		query += fmt.Sprintf(" AND price <= $%d", len(args))
 	}
 
-	//  Лимит 
 	limit := filter.Limit
 	if limit <= 0 {
 		limit = 10
 	}
-	query += fmt.Sprintf(" LIMIT $%d", argID)
-	args = append(args, limit)
-	argID++
 
-	//Офсет
+	args = append(args, limit)
+	query += fmt.Sprintf(" LIMIT $%d", len(args))
+
 	if filter.Offset > 0 {
-		query += fmt.Sprintf(" OFFSET $%d", argID)
 		args = append(args, filter.Offset)
-		argID++
+		query += fmt.Sprintf(" OFFSET $%d", len(args))
 	}
 
-	//выполенение запроса
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		r.log.Error("failed to get list", slog.String("op", op), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	defer rows.Close()
-	//запись данных
-	subs := make([]domain.Subscription, 0)
+
+	var subs []domain.Subscription
 	for rows.Next() {
 		var sub domain.Subscription
 		err := rows.Scan(
@@ -191,11 +179,11 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.U
 	const op = "repository.postgres.GetTotalCost"
 
 	query := `
-		SELECT COALESCE(SUM(price), 0) 
-		FROM subscriptions 
-		WHERE user_id = $1 
-		  AND start_date <= $2 
-		  AND (end_date IS NULL OR end_date >= $3)`
+    SELECT COALESCE(SUM(price), 0) 
+    FROM subscriptions 
+    WHERE user_id = $1 
+      AND TO_DATE(start_date, 'MM-YYYY') <= $2 
+      AND (end_date IS NULL OR TO_DATE(end_date, 'MM-YYYY') >= $3)`
 
 	args := []interface{}{userID, to, from}
 	argID := 4
@@ -220,8 +208,11 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.U
 func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, serviceName string) (bool, error) {
 	const op = "repository.postgres.Exists"
 	query := `select exists(
-		select 1 from subscriptions where user_id = $1 and service_name =$2 and(end_date IS NULL OR end_date > NOW()) 
-	)`
+    select 1 from subscriptions 
+    where user_id = $1 
+      and service_name = $2 
+      and (end_date IS NULL OR TO_DATE(end_date, 'MM-YYYY') >= DATE_TRUNC('month', NOW()))
+)`
 
 	var exists bool
 
@@ -237,15 +228,10 @@ func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, s
 }
 
 // Продление подписки
-func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDate time.Time) error {
+func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDate string) error {
 	const op = "repository.postgres.Extend"
-
-	query := `
-		UPDATE subscriptions 
-		SET end_date = $1, updated_at = NOW() 
-		WHERE id = $2`
-
-	res, err := r.db.ExecContext(ctx, query, newEndDate, id)
+    query := `UPDATE subscriptions SET end_date = $1, updated_at = NOW() WHERE id = $2`
+    res, err := r.db.ExecContext(ctx, query, newEndDate, id)
 	if err != nil {
 		r.log.Error("failed to extend subscription",
 			slog.String("op", op),

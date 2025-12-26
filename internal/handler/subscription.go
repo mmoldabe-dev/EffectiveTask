@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -38,10 +39,18 @@ func (h *HandlerSubscription) SetupRouter() *http.ServeMux {
 
 	return mux
 }
+
+var monthYearRegex = regexp.MustCompile(`^(0[1-9]|1[0-2])-\d{4}$`)
+
 func isInvalidDate(dateStr string) bool {
 	if dateStr == "" {
 		return false
 	}
+
+	if !monthYearRegex.MatchString(dateStr) {
+		return true
+	}
+
 	_, err := time.Parse("01-2006", dateStr)
 	return err != nil
 }
@@ -70,7 +79,7 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 		http.Error(w, "user_id is required", http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(input.ServiceName) == "" {
+	if strings.TrimSpace(input.ServiceName) == "" || len(input.ServiceName) > 100 {
 		http.Error(w, "service_name is required", http.StatusBadRequest)
 		return
 	}
@@ -82,9 +91,14 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 		http.Error(w, "invalid start_date format (MM-YYYY)", http.StatusBadRequest)
 		return
 	}
-	if input.EndDate != nil && isInvalidDate(*input.EndDate) {
-		http.Error(w, "invalid end_date format (MM-YYYY)", http.StatusBadRequest)
-		return
+	if input.EndDate != nil {
+		startDate, _ := time.Parse("01-2006", input.StartDate)
+		endDate, _ := time.Parse("01-2006", *input.EndDate)
+
+		if endDate.Before(startDate) {
+			http.Error(w, "end_date must be after or equal to start_date", http.StatusBadRequest)
+			return
+		}
 	}
 	id, err := h.services.Create(r.Context(), input)
 	if err != nil {
@@ -101,7 +115,7 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)
-	if err != nil || id <= 0 {
+	if err != nil {
 		h.log.Error("invalid id parameter", slog.String("id", idStr))
 		http.Error(w, "id must be a number", http.StatusBadRequest)
 		return
@@ -121,7 +135,7 @@ func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Req
 func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)
-	if err != nil || id <= 0 {
+	if err != nil {
 		h.log.Error("invalid id parameter", slog.String("id", idStr))
 		http.Error(w, "id must be a number", http.StatusBadRequest)
 		return
@@ -129,7 +143,7 @@ func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.
 
 	if err := h.services.Delete(r.Context(), id); err != nil {
 		h.log.Error("failed to delete subscription", slog.Int64("id", id), slog.String("error", err.Error()))
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(w, "subscription not found", http.StatusNotFound)
 		return
 	}
 
@@ -153,6 +167,10 @@ func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Re
 		if val, err := strconv.Atoi(lStr); err == nil && val > 0 {
 			limit = val
 		}
+	}
+	if limit > 200 {
+		http.Error(w, "the amount of data to output should be less", http.StatusBadRequest)
+		return
 	}
 
 	offset := 0
@@ -226,10 +244,9 @@ func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.Request) {
-
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)
-	if err != nil || id <= 0 {
+	if err != nil {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
@@ -246,10 +263,10 @@ func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.
 		http.Error(w, "invalid date format (MM-YYYY)", http.StatusBadRequest)
 		return
 	}
-	date, _ := time.Parse("01-2006", req.EndDate)
 
-	if err := h.services.Extend(r.Context(), id, date); err != nil {
-		http.Error(w, "subscription not found", http.StatusNotFound)
+	if err := h.services.Extend(r.Context(), id, req.EndDate); err != nil {
+		h.log.Error("extend failed", slog.String("error", err.Error()))
+		http.Error(w, "failed to extend subscription", http.StatusNotFound)
 		return
 	}
 
