@@ -18,7 +18,7 @@ type SubscriptionInterface interface {
 	List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
 	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) (int64, error)
 	Exists(ctx context.Context, userID uuid.UUID, serviceName string) (bool, error)
-	Extend(ctx context.Context, id int64, newEndDate string) error
+	Extend(ctx context.Context, id int64, newEndDate string, newPrice int) error
 }
 
 type SubscriptionRepository struct {
@@ -228,15 +228,13 @@ func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, s
 }
 
 // Продление подписки
-func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDate string) error {
+func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDate string, newPrice int) error {
 	const op = "repository.postgres.Extend"
-	query := `UPDATE subscriptions SET end_date = $1, updated_at = NOW() WHERE id = $2`
-	res, err := r.db.ExecContext(ctx, query, newEndDate, id)
+	query := `UPDATE subscriptions SET end_date = $1, price = $2, updated_at = NOW() WHERE id = $3`
+
+	res, err := r.db.ExecContext(ctx, query, newEndDate, newPrice, id)
 	if err != nil {
-		r.log.Error("failed to extend subscription",
-			slog.String("op", op),
-			slog.String("error", err.Error()),
-		)
+		r.log.Error("failed to extend subscription", slog.String("op", op), slog.String("error", err.Error()))
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
@@ -244,7 +242,6 @@ func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDat
 	if err != nil {
 		return fmt.Errorf("%s: failed to get rows affected: %w", op, err)
 	}
-
 	if rows == 0 {
 		return fmt.Errorf("%s: subscription not found", op)
 	}

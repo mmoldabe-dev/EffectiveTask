@@ -21,7 +21,7 @@ type SubscriptionServiceInterface interface {
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
 	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, fromStr, toStr string) (int64, error)
-	Extend(ctx context.Context, id int64, newEndDateStr string) error
+	Extend(ctx context.Context, id int64, newEndDateStr string, newPrice int) error
 }
 
 type SubscriptionService struct {
@@ -137,11 +137,15 @@ func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID
 
 var monthYearRegex = regexp.MustCompile(`^(0[1-9]|1[0-2])-\d{4}$`)
 
-func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDateStr string) error {
+func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDateStr string, newPrice int) error {
 	const op = "service.Subscription.Extend"
 
 	if !monthYearRegex.MatchString(newEndDateStr) {
 		return fmt.Errorf("%s: invalid date format", op)
+	}
+
+	if newPrice < 0 {
+		return fmt.Errorf("%s: price cannot be negative", op)
 	}
 
 	sub, err := s.repo.GetByID(ctx, id)
@@ -172,7 +176,7 @@ func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDateSt
 		}
 	}
 
-	err = s.repo.Extend(ctx, id, newEndDateStr)
+	err = s.repo.Extend(ctx, id, newEndDateStr, newPrice)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
