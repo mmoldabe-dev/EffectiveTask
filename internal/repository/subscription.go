@@ -179,13 +179,13 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.U
 	const op = "repository.postgres.GetTotalCost"
 
 	query := `
-    SELECT COALESCE(SUM(price), 0) 
-    FROM subscriptions 
-    WHERE user_id = $1 
-      AND TO_DATE(start_date, 'MM-YYYY') <= $2 
-      AND (end_date IS NULL OR TO_DATE(end_date, 'MM-YYYY') >= $3)`
+SELECT COALESCE(SUM(price), 0) 
+FROM subscriptions 
+WHERE user_id = $1 
+  AND TO_DATE(start_date, 'MM-YYYY') <= $3 
+  AND (end_date IS NULL OR TO_DATE(end_date, 'MM-YYYY') >= $2)`
 
-	args := []interface{}{userID, to, from}
+	args := []interface{}{userID, from, to}
 	argID := 4
 
 	if serviceName != "" {
@@ -230,8 +230,8 @@ func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, s
 // Продление подписки
 func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDate string) error {
 	const op = "repository.postgres.Extend"
-    query := `UPDATE subscriptions SET end_date = $1, updated_at = NOW() WHERE id = $2`
-    res, err := r.db.ExecContext(ctx, query, newEndDate, id)
+	query := `UPDATE subscriptions SET end_date = $1, updated_at = NOW() WHERE id = $2`
+	res, err := r.db.ExecContext(ctx, query, newEndDate, id)
 	if err != nil {
 		r.log.Error("failed to extend subscription",
 			slog.String("op", op),

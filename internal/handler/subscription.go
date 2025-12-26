@@ -29,7 +29,7 @@ func NewHandlerSubscription(services service.SubscriptionServiceInterface, log *
 	}
 }
 
-func (h *HandlerSubscription) SetupRouter() *http.ServeMux {
+func (h *HandlerSubscription) SetupRouter() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /subscriptions", h.createSubscription)
@@ -44,7 +44,7 @@ func (h *HandlerSubscription) SetupRouter() *http.ServeMux {
 	handler = middleware.LogginMiddleware(h.log)(handler)
 	handler = middleware.RecoverMiddleware(h.log)(handler)
 
-	return mux
+	return handler
 }
 
 var monthYearRegex = regexp.MustCompile(`^(0[1-9]|1[0-2])-\d{4}$`)
@@ -81,7 +81,7 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	
+
 	if input.UserID == uuid.Nil {
 		http.Error(w, "user_id is required", http.StatusBadRequest)
 		return
@@ -94,13 +94,20 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 		http.Error(w, "price cannot be negative", http.StatusBadRequest)
 		return
 	}
-	if isInvalidDate(input.StartDate) {
-		http.Error(w, "invalid start_date format (MM-YYYY)", http.StatusBadRequest)
-		return
-	}
 	if input.EndDate != nil {
-		startDate, _ := time.Parse("01-2006", input.StartDate)
-		endDate, _ := time.Parse("01-2006", *input.EndDate)
+
+		if isInvalidDate(*input.EndDate) {
+			http.Error(w, "invalid end_date format (MM-YYYY)", http.StatusBadRequest)
+			return
+		}
+
+		startDate, errS := time.Parse("01-2006", input.StartDate)
+		endDate, errE := time.Parse("01-2006", *input.EndDate)
+
+		if errS != nil || errE != nil {
+			http.Error(w, "invalid date values", http.StatusBadRequest)
+			return
+		}
 
 		if endDate.Before(startDate) {
 			http.Error(w, "end_date must be after or equal to start_date", http.StatusBadRequest)
@@ -110,7 +117,7 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 	id, err := h.services.Create(r.Context(), input)
 	if err != nil {
 		if errors.Is(err, service.ErrSubscriptionExists) {
-			http.Error(w, err.Error(), http.StatusConflict) 
+			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 		h.log.Error("failed to create subscription", slog.String("error", err.Error()))
@@ -258,29 +265,39 @@ func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)
 	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+		http.Error(w, "invalid id format", http.StatusBadRequest)
 		return
 	}
 
 	var req struct {
 		EndDate string `json:"end_date"`
 	}
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
+	// Обязательно проверяем формат строки в хендлере перед передачей в сервис
 	if isInvalidDate(req.EndDate) {
 		http.Error(w, "invalid date format (MM-YYYY)", http.StatusBadRequest)
 		return
 	}
 
+	// Вызываем сервис
 	if err := h.services.Extend(r.Context(), id, req.EndDate); err != nil {
-		h.log.Error("extend failed", slog.String("error", err.Error()))
-		http.Error(w, "failed to extend subscription", http.StatusNotFound)
+		// Если сервис вернул ошибку, логируем её и отдаем 400 или 404
+		h.log.Error("failed to extend", slog.String("error", err.Error()))
+
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "subscription not found", http.StatusNotFound)
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success", "updated_end_date": req.EndDate})
 }

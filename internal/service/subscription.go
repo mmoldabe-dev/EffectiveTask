@@ -52,9 +52,7 @@ func (s *SubscriptionService) Create(ctx context.Context, sub domain.Subscriptio
 	if exists {
 		return 0, ErrSubscriptionExists
 	}
-	if exists {
-		return 0, fmt.Errorf("%s, such a subscription already exists", op)
-	}
+
 	id, err := s.repo.Create(ctx, sub)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
@@ -151,15 +149,27 @@ func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDateSt
 		return fmt.Errorf("%s: subscription not found: %w", op, err)
 	}
 
-	startDate, _ := time.Parse("01-2006", sub.StartDate)
-	newEndDate, _ := time.Parse("01-2006", newEndDateStr)
+	startDate, errS := time.Parse("01-2006", sub.StartDate)
+	newEndDate, errE := time.Parse("01-2006", newEndDateStr)
+	if errS != nil || errE != nil {
+		return fmt.Errorf("%s: internal date parse error", op)
+	}
+
+	now := time.Now()
+	currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	if newEndDate.Before(currentMonth) {
+		return fmt.Errorf("%s: cannot extend to a past date", op)
+	}
 
 	if newEndDate.Before(startDate) {
 		return fmt.Errorf("%s: new end date cannot be before start date", op)
 	}
 
-	if newEndDate.Before(time.Now().Truncate(24 * time.Hour)) {
-		return fmt.Errorf("%s: cannot extend to a past date", op)
+	if sub.EndDate != nil {
+		oldEndDate, _ := time.Parse("01-2006", *sub.EndDate)
+		if newEndDate.Before(oldEndDate) || newEndDate.Equal(oldEndDate) {
+			return fmt.Errorf("%s: new end date must be after current end date", op)
+		}
 	}
 
 	err = s.repo.Extend(ctx, id, newEndDateStr)
