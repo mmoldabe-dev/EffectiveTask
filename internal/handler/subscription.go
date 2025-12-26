@@ -180,16 +180,14 @@ func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.
 
 // @Summary Список подписок / List subscriptions
 // @Description Получить список подписок пользователя с фильтрами / Get user subscriptions with filters
-// @Tags subscriptions
 // @Produce json
-// @Param user_id query string true "UUID пользователя"
+// @Param user_id query string true "UUID пользователя" example(550e8400-e29b-41d4-a716-446655440000)
 // @Param service_name query string false "Название сервиса"
-// @Param limit query int false "Лимит записей (default 10)"
-// @Param offset query int false "Смещение"
-// @Param min_price query int false "Минимальная цена"
-// @Param max_price query int false "Максимальная цена"
+// @Param limit query int false "Лимит" example(5)
+// @Param offset query int false "Смещение" example(3)
+// @Param min_price query int false "Мин. цена" example(1000)
+// @Param max_price query int false "Макс. цена" example(1300)
 // @Success 200 {array} domain.Subscription
-// @Failure 400 {string} string "Ошибка параметров / Invalid params"
 // @Router /subscriptions [get]
 func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -253,15 +251,13 @@ func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Re
 }
 
 // @Summary Суммарная стоимость / Total cost
-// @Description Подсчет стоимости за период с детализацией / Calculate total cost for period with details
 // @Tags subscriptions
 // @Produce json
-// @Param user_id query string true "UUID пользователя"
-// @Param from query string true "Начало периода (MM-YYYY)"
-// @Param to query string true "Конец периода (MM-YYYY)"
+// @Param user_id query string true "UUID пользователя" example(550e8400-e29b-41d4-a716-446655440000)
+// @Param from query string true "Начало (MM-YYYY)" example(01-2026)
+// @Param to query string true "Конец (MM-YYYY)" example(12-2026)
 // @Param service_name query string false "Название сервиса"
-// @Success 200 {object} map[string]interface{} "total_cost, details, period"
-// @Failure 400 {string} string "Ошибка дат / Invalid dates"
+// @Success 200 {object} map[string]interface{} "Пример: {total_cost: 30000, details: [...]}"
 // @Router /subscriptions/total [get]
 func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("user_id")
@@ -311,15 +307,18 @@ func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(response)
 }
 
+type ExtendInput struct {
+	EndDate string `json:"end_date" example:"12-2027"`
+	Price   int    `json:"price" example:"600"`
+}
+
 // @Summary Продлить подписку / Extend subscription
-// @Description Обновить дату окончания и цену существующей подписки / Update end date and price
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param id path int true "ID подписки"
-// @Param input body object true "Новая дата и цена / New date and price"
-// @Success 200 {object} map[string]string "status: success"
-// @Failure 404 {string} string "Не найдено / Not found"
+// @Param id path int true "ID подписки" example(1)
+// @Param input body ExtendInput true "Новые данные"
+// @Success 200 {object} map[string]string "example: {status: success}"
 // @Router /subscriptions/{id}/extend [put]
 func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
@@ -329,10 +328,7 @@ func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var req struct {
-		EndDate string `json:"end_date"`
-		Price   int    `json:"price"`
-	}
+	var req ExtendInput
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)

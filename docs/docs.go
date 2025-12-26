@@ -21,13 +21,11 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
-                "tags": [
-                    "subscriptions"
-                ],
                 "summary": "Список подписок / List subscriptions",
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "description": "UUID пользователя",
                         "name": "user_id",
                         "in": "query",
@@ -41,25 +39,29 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Лимит записей (default 10)",
+                        "example": 5,
+                        "description": "Лимит",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "example": 3,
                         "description": "Смещение",
                         "name": "offset",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Минимальная цена",
+                        "example": 1000,
+                        "description": "Мин. цена",
                         "name": "min_price",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Максимальная цена",
+                        "example": 1300,
+                        "description": "Макс. цена",
                         "name": "max_price",
                         "in": "query"
                     }
@@ -72,12 +74,6 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/domain.Subscription"
                             }
-                        }
-                    },
-                    "400": {
-                        "description": "Ошибка параметров / Invalid params",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -133,7 +129,6 @@ const docTemplate = `{
         },
         "/subscriptions/total": {
             "get": {
-                "description": "Подсчет стоимости за период с детализацией / Calculate total cost for period with details",
                 "produces": [
                     "application/json"
                 ],
@@ -144,6 +139,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "description": "UUID пользователя",
                         "name": "user_id",
                         "in": "query",
@@ -151,14 +147,16 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Начало периода (MM-YYYY)",
+                        "example": "01-2026",
+                        "description": "Начало (MM-YYYY)",
                         "name": "from",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Конец периода (MM-YYYY)",
+                        "example": "12-2026",
+                        "description": "Конец (MM-YYYY)",
                         "name": "to",
                         "in": "query",
                         "required": true
@@ -172,16 +170,10 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "total_cost, details, period",
+                        "description": "Пример: {total_cost: 30000, details: [...]}",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Ошибка дат / Invalid dates",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -260,7 +252,6 @@ const docTemplate = `{
         },
         "/subscriptions/{id}/extend": {
             "put": {
-                "description": "Обновить дату окончания и цену существующей подписки / Update end date and price",
                 "consumes": [
                     "application/json"
                 ],
@@ -274,35 +265,30 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "example": 1,
                         "description": "ID подписки",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Новая дата и цена / New date and price",
+                        "description": "Новые данные",
                         "name": "input",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/handler.ExtendInput"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "status: success",
+                        "description": "example: {status: success}",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
                                 "type": "string"
                             }
-                        }
-                    },
-                    "404": {
-                        "description": "Не найдено / Not found",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -313,29 +299,42 @@ const docTemplate = `{
         "domain.Subscription": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string"
-                },
                 "end_date": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "12-2026"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 10
                 },
                 "price": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 500
                 },
                 "service_name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Spotify Premium"
                 },
                 "start_date": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "01-2026"
                 },
                 "user_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "handler.ExtendInput": {
+            "type": "object",
+            "properties": {
+                "end_date": {
+                    "type": "string",
+                    "example": "12-2027"
+                },
+                "price": {
+                    "type": "integer",
+                    "example": 600
                 }
             }
         }

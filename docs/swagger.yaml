@@ -1,22 +1,33 @@
 definitions:
   domain.Subscription:
     properties:
-      created_at:
-        type: string
       end_date:
+        example: 12-2026
         type: string
       id:
+        example: 10
         type: integer
       price:
+        example: 500
         type: integer
       service_name:
+        example: Spotify Premium
         type: string
       start_date:
-        type: string
-      updated_at:
+        example: 01-2026
         type: string
       user_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
         type: string
+    type: object
+  handler.ExtendInput:
+    properties:
+      end_date:
+        example: 12-2027
+        type: string
+      price:
+        example: 600
+        type: integer
     type: object
 info:
   contact: {}
@@ -30,6 +41,7 @@ paths:
         with filters
       parameters:
       - description: UUID пользователя
+        example: 550e8400-e29b-41d4-a716-446655440000
         in: query
         name: user_id
         required: true
@@ -38,19 +50,23 @@ paths:
         in: query
         name: service_name
         type: string
-      - description: Лимит записей (default 10)
+      - description: Лимит
+        example: 5
         in: query
         name: limit
         type: integer
       - description: Смещение
+        example: 3
         in: query
         name: offset
         type: integer
-      - description: Минимальная цена
+      - description: Мин. цена
+        example: 1000
         in: query
         name: min_price
         type: integer
-      - description: Максимальная цена
+      - description: Макс. цена
+        example: 1300
         in: query
         name: max_price
         type: integer
@@ -63,13 +79,7 @@ paths:
             items:
               $ref: '#/definitions/domain.Subscription'
             type: array
-        "400":
-          description: Ошибка параметров / Invalid params
-          schema:
-            type: string
       summary: Список подписок / List subscriptions
-      tags:
-      - subscriptions
     post:
       consumes:
       - application/json
@@ -156,52 +166,48 @@ paths:
     put:
       consumes:
       - application/json
-      description: Обновить дату окончания и цену существующей подписки / Update end
-        date and price
       parameters:
       - description: ID подписки
+        example: 1
         in: path
         name: id
         required: true
         type: integer
-      - description: Новая дата и цена / New date and price
+      - description: Новые данные
         in: body
         name: input
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/handler.ExtendInput'
       produces:
       - application/json
       responses:
         "200":
-          description: 'status: success'
+          description: 'example: {status: success}'
           schema:
             additionalProperties:
               type: string
             type: object
-        "404":
-          description: Не найдено / Not found
-          schema:
-            type: string
       summary: Продлить подписку / Extend subscription
       tags:
       - subscriptions
   /subscriptions/total:
     get:
-      description: Подсчет стоимости за период с детализацией / Calculate total cost
-        for period with details
       parameters:
       - description: UUID пользователя
+        example: 550e8400-e29b-41d4-a716-446655440000
         in: query
         name: user_id
         required: true
         type: string
-      - description: Начало периода (MM-YYYY)
+      - description: Начало (MM-YYYY)
+        example: 01-2026
         in: query
         name: from
         required: true
         type: string
-      - description: Конец периода (MM-YYYY)
+      - description: Конец (MM-YYYY)
+        example: 12-2026
         in: query
         name: to
         required: true
@@ -214,14 +220,10 @@ paths:
       - application/json
       responses:
         "200":
-          description: total_cost, details, period
+          description: 'Пример: {total_cost: 30000, details: [...]}'
           schema:
             additionalProperties: true
             type: object
-        "400":
-          description: Ошибка дат / Invalid dates
-          schema:
-            type: string
       summary: Суммарная стоимость / Total cost
       tags:
       - subscriptions
