@@ -41,13 +41,13 @@ func (h *HandlerSubscription) SetupRouter() http.Handler {
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	var handler http.Handler = mux
+	// накидываем мидлвары
 	handler = middleware.JSONMiddleware(handler)
 	handler = middleware.LogginMiddleware(h.log)(handler)
 	handler = middleware.RecoverMiddleware(h.log)(handler)
 
 	return handler
 }
-
 
 type CreateSubscriptionRequest struct {
 	UserID      uuid.UUID `json:"user_id" example:"550e8400-e29b-41d4-a716-446655440000"`
@@ -57,60 +57,55 @@ type CreateSubscriptionRequest struct {
 	EndDate     *string   `json:"end_date,omitempty" example:"12-2026"`
 }
 
-// @Summary  Create subscription
+// @Summary Create subscription
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param input body CreateSubscriptionRequest true Subscription data"
-// @Success 201 {object} map[string]int64 "id"
-// @Failure 400 {string} string " Validation error"
-// @Failure 409 {string} string "Subscription already exists"
+// @Param input body CreateSubscriptionRequest true "Subscription info"
+// @Success 201 {object} map[string]int64
+// @Failure 400 {string} string
+// @Failure 409 {string} string
 // @Router /subscriptions [post]
 func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.Request) {
 	var input domain.Subscription
-
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		h.log.Error("failed to decode request body", slog.String("error", err.Error()))
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		h.log.Error("body decode fail", slog.String("err", err.Error()))
+		http.Error(w, "invalid request body", 400)
 		return
 	}
 
+	// валидация входных данных
 	if input.UserID == uuid.Nil {
-		http.Error(w, "user_id is required", http.StatusBadRequest)
+		http.Error(w, "user_id is required", 400)
 		return
 	}
 
 	if strings.TrimSpace(input.ServiceName) == "" || len(input.ServiceName) > 100 {
-		http.Error(w, "service_name is required and must be <= 100 characters", http.StatusBadRequest)
+		http.Error(w, "service_name too long or empty", 400)
 		return
 	}
 
 	if input.Price < 0 {
-		http.Error(w, "price cannot be negative", http.StatusBadRequest)
+		http.Error(w, "price cant be negative", 400)
 		return
 	}
 
 	if isInvalidDate(input.StartDate) {
-		http.Error(w, "invalid start_date format (MM-YYYY)", http.StatusBadRequest)
+		http.Error(w, "bad start_date (MM-YYYY)", 400)
 		return
 	}
 
 	if input.EndDate != nil {
 		if isInvalidDate(*input.EndDate) {
-			http.Error(w, "invalid end_date format (MM-YYYY)", http.StatusBadRequest)
+			http.Error(w, "bad end_date", 400)
 			return
 		}
 
-		startDate, errS := time.Parse("01-2006", input.StartDate)
-		endDate, errE := time.Parse("01-2006", *input.EndDate)
+		sDate, _ := time.Parse("01-2006", input.StartDate)
+		eDate, _ := time.Parse("01-2006", *input.EndDate)
 
-		if errS != nil || errE != nil {
-			http.Error(w, "invalid date values", http.StatusBadRequest)
-			return
-		}
-
-		if endDate.Before(startDate) {
-			http.Error(w, "end_date must be after or equal to start_date", http.StatusBadRequest)
+		if eDate.Before(sDate) {
+			http.Error(w, "end date before start date", 400)
 			return
 		}
 	}
@@ -118,40 +113,39 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 	id, err := h.services.Create(r.Context(), input)
 	if err != nil {
 		if errors.Is(err, service.ErrSubscriptionExists) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			http.Error(w, err.Error(), 409)
 			return
 		}
-		h.log.Error("failed to create subscription", slog.String("error", err.Error()))
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		h.log.Error("create failed", slog.String("err", err.Error()))
+		http.Error(w, "internal error", 500)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(201)
 	json.NewEncoder(w).Encode(map[string]int64{"id": id})
 }
 
-// @Summary Get subscription
-
+// @Summary Get subscription details
 // @Tags subscriptions
 // @Produce json
 // @Param id path int true "Subscription ID"
 // @Success 200 {object} domain.Subscription
-// @Failure 404 {string} string "Not found"
+// @Failure 404 {string} string
 // @Router /subscriptions/{id} [get]
 func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)
 	if err != nil {
-		h.log.Error("invalid id parameter", slog.String("id", idStr))
-		http.Error(w, "id must be a positive number", http.StatusBadRequest)
+		h.log.Error("bad id param", slog.String("id", idStr))
+		http.Error(w, "id must be positive", 400)
 		return
 	}
 
 	sub, err := h.services.GetByID(r.Context(), id)
 	if err != nil {
-		h.log.Error("failed to get subscription", slog.Int64("id", id), slog.String("error", err.Error()))
-		http.Error(w, "subscription not found", http.StatusNotFound)
+		h.log.Error("get sub fail", slog.Int64("id", id), slog.String("err", err.Error()))
+		http.Error(w, "sub not found", 404)
 		return
 	}
 
@@ -159,106 +153,84 @@ func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(sub)
 }
 
-// @Summary  Delete subscription
+// @Summary Delete subscription
 // @Tags subscriptions
-// @Produce json
-// @Param id path int true 
-// @Success 200 {object} map[string]string "status: deleted"
-// @Failure 404 {string} string " Not found"
+// @Param id path int true "Subscription ID"
+// @Success 200 {object} map[string]string
+// @Failure 404 {string} string
 // @Router /subscriptions/{id} [delete]
 func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)
 	if err != nil {
-		h.log.Error("invalid id parameter", slog.String("id", idStr))
-		http.Error(w, "id must be a positive number", http.StatusBadRequest)
+		http.Error(w, "invalid id", 400)
 		return
 	}
 
 	if err := h.services.Delete(r.Context(), id); err != nil {
-		h.log.Error("failed to delete subscription", slog.Int64("id", id), slog.String("error", err.Error()))
-		http.Error(w, "subscription not found", http.StatusNotFound)
+		h.log.Error("delete fail", slog.Int64("id", id), slog.String("error", err.Error()))
+		http.Error(w, "not found", 404)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 }
 
 // @Summary List subscriptions
-
 // @Tags subscriptions
 // @Produce json
-// @Param user_id query string true "UUID " example(550e8400-e29b-41d4-a716-446655440000)
-// @Param service_name query string false 
-// @Param limit query int false  example(5)
-// @Param offset query int false  example(0)
-// @Param min_price query int false  example(1000)
-// @Param max_price query int false  example(1300)
+// @Param user_id query string true "User UUID"
+// @Param service_name query string false "Service filter"
+// @Param limit query int false "Limit"
+// @Param offset query int false "Offset"
+// @Param min_price query int false "Min price"
+// @Param max_price query int false "Max price"
 // @Success 200 {array} domain.Subscription
-// @Failure 400 {string} string 
+// @Failure 400 {string} string
 // @Router /subscriptions [get]
 func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
+	q := r.URL.Query()
 
-	userIdStr := query.Get("user_id")
-	userID, err := uuid.Parse(userIdStr)
+	uIDStr := q.Get("user_id")
+	uID, err := uuid.Parse(uIDStr)
 	if err != nil {
-		h.log.Error("invalid user_id", slog.String("val", userIdStr))
-		http.Error(w, "invalid user_id (UUID expected)", http.StatusBadRequest)
+		h.log.Error("bad user_id", slog.String("val", uIDStr))
+		http.Error(w, "invalid user_id", 400)
 		return
 	}
 
 	limit := 10
-	if lStr := query.Get("limit"); lStr != "" {
-		if val, err := strconv.Atoi(lStr); err == nil && val > 0 {
+	if l := q.Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
 			limit = val
 		}
 	}
+	
 	if limit > 200 {
-		http.Error(w, "limit must be <= 200", http.StatusBadRequest)
+		http.Error(w, "limit too big", 400)
 		return
 	}
 
-	offset := 0
-	if oStr := query.Get("offset"); oStr != "" {
-		if val, err := strconv.Atoi(oStr); err == nil && val >= 0 {
-			offset = val
-		}
-	}
-
-	var minPrice, maxPrice int
-	if minStr := query.Get("min_price"); minStr != "" {
-		minPrice, _ = strconv.Atoi(minStr)
-	}
-	if maxStr := query.Get("max_price"); maxStr != "" {
-		maxPrice, _ = strconv.Atoi(maxStr)
-	}
-	if minPrice < 0 || maxPrice < 0 {
-		http.Error(w, "prices must be non-negative", http.StatusBadRequest)
-		return
-	}
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	minP, _ := strconv.Atoi(q.Get("min_price"))
+	maxP, _ := strconv.Atoi(q.Get("max_price"))
 
 	filter := domain.SubscriptionFilter{
-		UserID:      userID,
-		ServiceName: query.Get("service_name"),
-		MinPrice:    minPrice,
-		MaxPrice:    maxPrice,
-		Limit:       limit,
-		Offset:      offset,
+		UserID:      uID,
+		ServiceName: q.Get("service_name"),
+		MinPrice:    minP, MaxPrice: maxP,
+		Limit: limit, Offset: offset,
 	}
 
-	subs, err := h.services.List(r.Context(), userID, filter)
+	subs, err := h.services.List(r.Context(), uID, filter)
 	if err != nil {
-		h.log.Error("failed to get list", slog.String("error", err.Error()))
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		h.log.Error("list fail", slog.String("error", err.Error()))
+		http.Error(w, "internal error", 500)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(subs)
 }
-
 
 type TotalCostResponse struct {
 	TotalCost int64             `json:"total_cost" example:"6000"`
@@ -267,62 +239,61 @@ type TotalCostResponse struct {
 	Warning   string            `json:"warning,omitempty"`
 }
 
-// @Summary Total cost
+// @Summary Calculate total cost
 // @Tags subscriptions
 // @Produce json
-// @Param user_id query string true "UUID" example(550e8400-e29b-41d4-a716-446655440000)
-// @Param from query string true "(MM-YYYY)" example(01-2026)
-// @Param to query string true "(MM-YYYY)" example(12-2026)
-// @Param service_name query string false "(опционально)" example(Spotify Premium)
+// @Param user_id query string true "User UUID"
+// @Param from query string true "Start date (MM-YYYY)"
+// @Param to query string true "End date (MM-YYYY)"
+// @Param service_name query string false "Service filter(не обязатльно)"
 // @Success 200 {object} TotalCostResponse
-// @Failure 400 {string} string 
+// @Failure 400 {string} string
 // @Router /subscriptions/total [get]
 func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.URL.Query().Get("user_id")
-	serviceName := r.URL.Query().Get("service_name")
-	fromStr := r.URL.Query().Get("from")
-	toStr := r.URL.Query().Get("to")
+	params := r.URL.Query()
+	uIDStr := params.Get("user_id")
+	fromStr := params.Get("from")
+	toStr := params.Get("to")
 
-	userID, err := uuid.Parse(userIDStr)
+	uID, err := uuid.Parse(uIDStr)
 	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
+		http.Error(w, "bad user_id", 400)
 		return
 	}
 
 	if isInvalidDate(fromStr) || isInvalidDate(toStr) {
-		http.Error(w, "invalid date format (MM-YYYY)", http.StatusBadRequest)
+		http.Error(w, "invalid date format", 400)
 		return
 	}
 
-	total, details, err := h.services.GetTotalCost(r.Context(), userID, serviceName, fromStr, toStr)
+	total, details, err := h.services.GetTotalCost(r.Context(), uID, params.Get("service_name"), fromStr, toStr)
 	if err != nil {
-		h.log.Error("failed to calculate total cost", slog.String("error", err.Error()))
-		http.Error(w, "failed to calculate cost", http.StatusBadRequest)
+		h.log.Error("cost calc faild", slog.String("err", err.Error()))
+		http.Error(w, "failed to calculate cost", 400)
 		return
 	}
 
-	response := map[string]interface{}{
+	resp := map[string]interface{}{
 		"total_cost": total,
 		"details":    details,
 		"period": map[string]string{
-			"from": fromStr,
-			"to":   toStr,
+			"from": fromStr, "to": toStr,
 		},
 	}
 
+	// чекаем если дата в будущем, кидаем ворнинг
 	if toStr != "" {
-		toDate, parseErr := time.Parse("01-2006", toStr)
-		if parseErr == nil {
+		if tDate, e := time.Parse("01-2006", toStr); e == nil {
 			now := time.Now()
-			currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-			if toDate.After(currentMonth) {
-				response["warning"] = "Period includes future dates - this is a forecast based on active subscriptions"
+			curr := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+			if tDate.After(curr) {
+				resp["warning"] = "Period includes future dates - forecast based on active subs"
 			}
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(resp)
 }
 
 type ExtendInput struct {
@@ -331,51 +302,42 @@ type ExtendInput struct {
 }
 
 // @Summary Extend subscription
-
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param id path int true  example(1)
-// @Param input body ExtendInput true
-// @Success 200 {object} map[string]string "status: success"
-// @Failure 400 {string} string "Неверные данные или дата"
-// @Failure 404 {string} string "Подписка не найдена"
+// @Param id path int true "Subscription ID"
+// @Param input body ExtendInput true "New data"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string
+// @Failure 404 {string} string
 // @Router /subscriptions/{id}/extend [put]
 func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := parseID(idStr)
+	id, err := parseID(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "invalid id format", http.StatusBadRequest)
+		http.Error(w, "bad id", 400)
 		return
 	}
 
 	var req ExtendInput
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		http.Error(w, "invalid body", 400)
 		return
 	}
 
-	if isInvalidDate(req.EndDate) {
-		http.Error(w, "invalid date format (MM-YYYY)", http.StatusBadRequest)
-		return
-	}
-
-	if req.Price < 0 {
-		http.Error(w, "price cannot be negative", http.StatusBadRequest)
+	if isInvalidDate(req.EndDate) || req.Price < 0 {
+		http.Error(w, "invalid data", 400)
 		return
 	}
 
 	if err := h.services.Extend(r.Context(), id, req.EndDate, req.Price); err != nil {
-		h.log.Error("failed to extend", slog.String("error", err.Error()))
+		h.log.Error("extend fail", slog.String("err", err.Error()))
 		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, "subscription not found", http.StatusNotFound)
+			http.Error(w, "not found", 404)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), 400)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }

@@ -35,28 +35,26 @@ func NewSubscriptionRepository(db *sql.DB, log *slog.Logger) *SubscriptionReposi
 	}
 }
 
-// Запись подписки
 func (r *SubscriptionRepository) Create(ctx context.Context, sub domain.Subscription) (int64, error) {
 	const op = "repository.postgres.Create"
-	query := `INSERT INTO subscriptions(service_name, price, user_id, start_date, end_date)	 VALUES($1, $2, $3, $4,$5)
-	RETURNING id
-	`
+	query := `INSERT INTO subscriptions(service_name, price, user_id, start_date, end_date)  VALUES($1, $2, $3, $4,$5)
+    RETURNING id
+    `
 	var id int64
 	err := r.db.QueryRowContext(ctx, query, sub.ServiceName, sub.Price, sub.UserID, sub.StartDate, sub.EndDate).Scan(&id)
 	if err != nil {
-		r.log.Error("faileed to create subscription", slog.String("op:", op), slog.String("error", err.Error()))
+		// чекаем если база отвалилась на инсерте
+		r.log.Error("faild to create sub", slog.String("op:", op), slog.String("error", err.Error()))
 		return 0, err
 	}
 	return id, nil
-
 }
 
-// Вывести подписку по id
 func (r *SubscriptionRepository) GetByID(ctx context.Context, id int64) (*domain.Subscription, error) {
 	const op = "repository.postgres.GetByID"
 	query := `
-	SELECT id, service_name, price,user_id, start_date, end_date,created_at, updated_at from subscriptions 
-	WHERE id=$1`
+    SELECT id, service_name, price,user_id, start_date, end_date,created_at, updated_at from subscriptions 
+    WHERE id=$1`
 
 	var sub domain.Subscription
 
@@ -73,11 +71,10 @@ func (r *SubscriptionRepository) GetByID(ctx context.Context, id int64) (*domain
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-
 			return nil, fmt.Errorf("%s: subscription not found: %w", op, err)
 		}
 
-		r.log.Error("failed to get subscription",
+		r.log.Error("cant get sub by id",
 			slog.String("op", op),
 			slog.Int64("id", id),
 			slog.String("error", err.Error()),
@@ -88,14 +85,13 @@ func (r *SubscriptionRepository) GetByID(ctx context.Context, id int64) (*domain
 	return &sub, nil
 }
 
-// удалние подписки
 func (r *SubscriptionRepository) Delete(ctx context.Context, id int64) error {
 	const op = "repository.postgres.Delete"
 	query := `DELETE FROM subscriptions WHERE id = $1`
 
 	res, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
-		r.log.Error("failed to execute delete query",
+		r.log.Error("db error during delete",
 			slog.String("op", op),
 			slog.String("error", err.Error()),
 		)
@@ -106,14 +102,11 @@ func (r *SubscriptionRepository) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("%s: failed to get rows affected: %w", op, err)
 	}
 	if rows == 0 {
-
 		return fmt.Errorf("%s: subscription with id %d not found", op, id)
 	}
-	r.log.Info("subscription deleted successfully", slog.Int64("id", id))
 	return nil
 }
 
-// фильтр
 func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error) {
 	const op = "repository.postgres.List"
 
@@ -123,6 +116,7 @@ func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, fil
 
 	args := []interface{}{userID}
 
+	// динамически собираем фильтры
 	if filter.ServiceName != "" {
 		args = append(args, "%"+filter.ServiceName+"%")
 		query += fmt.Sprintf(" AND service_name ILIKE $%d", len(args))
@@ -153,7 +147,7 @@ func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, fil
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		r.log.Error("failed to get list", slog.String("op", op), slog.String("error", err.Error()))
+		r.log.Error("list fetch failed", slog.String("op", op), slog.String("err", err.Error()))
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	defer rows.Close()
@@ -174,10 +168,10 @@ func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, fil
 	return subs, nil
 }
 
-
 func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) ([]domain.Subscription, error) {
 	const op = "repository.postgres.GetForPeriod"
 
+	// запрос для расчета стоимости за период
 	query := `
         SELECT service_name,price, start_date, end_date
         FROM subscriptions 
@@ -208,7 +202,6 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.U
 	return subs, nil
 }
 
-// Проверка на exists
 func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, serviceName string) (bool, error) {
 	const op = "repository.postgres.Exists"
 	query := `select exists(
@@ -222,7 +215,7 @@ func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, s
 
 	err := r.db.QueryRowContext(ctx, query, userID, serviceName).Scan(&exists)
 	if err != nil {
-		r.log.Error("failed to check subscription existence",
+		r.log.Error("existence check fail",
 			slog.String("op", op), slog.String("error", err.Error()),
 		)
 		return false, fmt.Errorf("%s: %w", op, err)
@@ -231,14 +224,14 @@ func (r *SubscriptionRepository) Exists(ctx context.Context, userID uuid.UUID, s
 	return exists, nil
 }
 
-// Продление подписки
 func (r *SubscriptionRepository) Extend(ctx context.Context, id int64, newEndDate string, newPrice int) error {
 	const op = "repository.postgres.Extend"
+	// обновляем дату и прайс
 	query := `UPDATE subscriptions SET end_date = $1, price = $2, updated_at = NOW() WHERE id = $3`
 
 	res, err := r.db.ExecContext(ctx, query, newEndDate, newPrice, id)
 	if err != nil {
-		r.log.Error("failed to extend subscription", slog.String("op", op), slog.String("error", err.Error()))
+		r.log.Error("extend query exec failed", slog.String("op", op), slog.String("error", err.Error()))
 		return fmt.Errorf("%s: %w", op, err)
 	}
 

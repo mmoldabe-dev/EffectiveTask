@@ -73,36 +73,29 @@ info:
 paths:
   /subscriptions:
     get:
-      description: Получить список подписок пользователя с фильтрами / Get user subscriptions
-        with filters
       parameters:
-      - description: UUID пользователя
-        example: 550e8400-e29b-41d4-a716-446655440000
+      - description: User UUID
         in: query
         name: user_id
         required: true
         type: string
-      - description: Название сервиса
+      - description: Service filter
         in: query
         name: service_name
         type: string
-      - description: Лимит (по умолчанию 10, максимум 200)
-        example: 5
+      - description: Limit
         in: query
         name: limit
         type: integer
-      - description: Смещение (по умолчанию 0)
-        example: 0
+      - description: Offset
         in: query
         name: offset
         type: integer
-      - description: Минимальная цена
-        example: 1000
+      - description: Min price
         in: query
         name: min_price
         type: integer
-      - description: Максимальная цена
-        example: 1300
+      - description: Max price
         in: query
         name: max_price
         type: integer
@@ -116,19 +109,17 @@ paths:
               $ref: '#/definitions/domain.Subscription'
             type: array
         "400":
-          description: Неверные параметры запроса
+          description: Bad Request
           schema:
             type: string
-      summary: Список подписок / List subscriptions
+      summary: List subscriptions
       tags:
       - subscriptions
     post:
       consumes:
       - application/json
-      description: Добавляет новую запись о подписке пользователя / Adds a new subscription
-        record
       parameters:
-      - description: Данные подписки / Subscription data
+      - description: Subscription info
         in: body
         name: input
         required: true
@@ -138,54 +129,48 @@ paths:
       - application/json
       responses:
         "201":
-          description: id новой записи
+          description: Created
           schema:
             additionalProperties:
               format: int64
               type: integer
             type: object
         "400":
-          description: Ошибка валидации / Validation error
+          description: Bad Request
           schema:
             type: string
         "409":
-          description: Подписка уже существует / Subscription already exists
+          description: Conflict
           schema:
             type: string
-      summary: Создать подписку / Create subscription
+      summary: Create subscription
       tags:
       - subscriptions
   /subscriptions/{id}:
     delete:
-      description: Удаляет запись о подписке по ID / Deletes subscription record by
-        ID
       parameters:
-      - description: ID подписки
+      - description: Subscription ID
         in: path
         name: id
         required: true
         type: integer
-      produces:
-      - application/json
       responses:
         "200":
-          description: 'status: deleted'
+          description: OK
           schema:
             additionalProperties:
               type: string
             type: object
         "404":
-          description: Не найдено / Not found
+          description: Not Found
           schema:
             type: string
-      summary: Удалить подписку / Delete subscription
+      summary: Delete subscription
       tags:
       - subscriptions
     get:
-      description: Получение данных подписки по её ID / Get subscription details by
-        ID
       parameters:
-      - description: ID подписки / Subscription ID
+      - description: Subscription ID
         in: path
         name: id
         required: true
@@ -198,26 +183,23 @@ paths:
           schema:
             $ref: '#/definitions/domain.Subscription'
         "404":
-          description: Не найдено / Not found
+          description: Not Found
           schema:
             type: string
-      summary: Получить подписку / Get subscription
+      summary: Get subscription details
       tags:
       - subscriptions
   /subscriptions/{id}/extend:
     put:
       consumes:
       - application/json
-      description: Обновляет дату окончания и цену существующей подписки / Updates
-        end date and price of existing subscription
       parameters:
-      - description: ID подписки
-        example: 1
+      - description: Subscription ID
         in: path
         name: id
         required: true
         type: integer
-      - description: Новые данные
+      - description: New data
         in: body
         name: input
         required: true
@@ -227,48 +209,41 @@ paths:
       - application/json
       responses:
         "200":
-          description: 'status: success'
+          description: OK
           schema:
             additionalProperties:
               type: string
             type: object
         "400":
-          description: Неверные данные или дата
+          description: Bad Request
           schema:
             type: string
         "404":
-          description: Подписка не найдена
+          description: Not Found
           schema:
             type: string
-      summary: Продлить подписку / Extend subscription
+      summary: Extend subscription
       tags:
       - subscriptions
   /subscriptions/total:
     get:
-      description: Рассчитывает общую стоимость подписок за указанный период. Если
-        указано service_name, расчет только для этого сервиса / Calculates total cost
-        of subscriptions for specified period
       parameters:
-      - description: UUID пользователя
-        example: 550e8400-e29b-41d4-a716-446655440000
+      - description: User UUID
         in: query
         name: user_id
         required: true
         type: string
-      - description: Начало периода (MM-YYYY)
-        example: 01-2026
+      - description: Start date (MM-YYYY)
         in: query
         name: from
         required: true
         type: string
-      - description: Конец периода (MM-YYYY)
-        example: 12-2026
+      - description: End date (MM-YYYY)
         in: query
         name: to
         required: true
         type: string
-      - description: Название сервиса (опционально)
-        example: Spotify Premium
+      - description: Service filter(не обязатльно)
         in: query
         name: service_name
         type: string
@@ -280,10 +255,10 @@ paths:
           schema:
             $ref: '#/definitions/handler.TotalCostResponse'
         "400":
-          description: Неверный формат даты или параметров
+          description: Bad Request
           schema:
             type: string
-      summary: Суммарная стоимость / Total cost
+      summary: Calculate total cost
       tags:
       - subscriptions
 swagger: "2.0"

@@ -9,15 +9,14 @@ import (
 func LogginMiddleware(log *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
+			t := time.Now() // засекаем время старта
 
 			next.ServeHTTP(w, r)
 
 			log.Info("request processed",
-				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
+				slog.String("method", r.Method), slog.String("path", r.URL.Path),
 				slog.String("remote_addr", r.RemoteAddr),
-				slog.Duration("duration", time.Since(start)),
+				slog.Duration("duration", time.Since(t)),
 			)
 		})
 	}
@@ -28,13 +27,15 @@ func RecoverMiddleware(log *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if err := recover(); err != nil {
-					log.Error("panic recovered",
-						slog.Any("error", err),
-						slog.String("path", r.URL.Path),
-					)
-					http.Error(w, "internal server error", http.StatusInternalServerError)
+					// если все упало — пишем в логи чтоб не пропустить
+					log.Error("panic recovred",
+						slog.Any("err", err),
+						slog.String("url", r.URL.Path))
+
+					http.Error(w, "internal server error", 500)
 				}
 			}()
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -42,6 +43,7 @@ func RecoverMiddleware(log *slog.Logger) func(http.Handler) http.Handler {
 
 func JSONMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// ставим заголовок для всех ответов
 		w.Header().Set("Content-Type", "application/json")
 		next.ServeHTTP(w, r)
 	})

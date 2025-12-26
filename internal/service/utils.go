@@ -3,6 +3,7 @@ package service
 import "time"
 
 func maxDate(a, b time.Time) time.Time {
+	// выбираем познию дату
 	if a.After(b) {
 		return a
 	}
@@ -10,6 +11,7 @@ func maxDate(a, b time.Time) time.Time {
 }
 
 func minDate(a, b time.Time) time.Time {
+	// берем ту что раньше
 	if a.Before(b) {
 		return a
 	}
@@ -24,5 +26,6 @@ func countMonths(start, end time.Time) int {
 	years := end.Year() - start.Year()
 	months := int(end.Month()) - int(start.Month())
 
+	// инклюзивно считаем месяцы, +1 чтоб текущий тоже зашел
 	return years*12 + months + 1
 }

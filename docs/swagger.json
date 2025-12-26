@@ -9,54 +9,48 @@
     "paths": {
         "/subscriptions": {
             "get": {
-                "description": "Получить список подписок пользователя с фильтрами / Get user subscriptions with filters",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "subscriptions"
                 ],
-                "summary": "Список подписок / List subscriptions",
+                "summary": "List subscriptions",
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "description": "UUID пользователя",
+                        "description": "User UUID",
                         "name": "user_id",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Название сервиса",
+                        "description": "Service filter",
                         "name": "service_name",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "example": 5,
-                        "description": "Лимит (по умолчанию 10, максимум 200)",
+                        "description": "Limit",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "example": 0,
-                        "description": "Смещение (по умолчанию 0)",
+                        "description": "Offset",
                         "name": "offset",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "example": 1000,
-                        "description": "Минимальная цена",
+                        "description": "Min price",
                         "name": "min_price",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "example": 1300,
-                        "description": "Максимальная цена",
+                        "description": "Max price",
                         "name": "max_price",
                         "in": "query"
                     }
@@ -72,7 +66,7 @@
                         }
                     },
                     "400": {
-                        "description": "Неверные параметры запроса",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "string"
                         }
@@ -80,7 +74,6 @@
                 }
             },
             "post": {
-                "description": "Добавляет новую запись о подписке пользователя / Adds a new subscription record",
                 "consumes": [
                     "application/json"
                 ],
@@ -90,10 +83,10 @@
                 "tags": [
                     "subscriptions"
                 ],
-                "summary": "Создать подписку / Create subscription",
+                "summary": "Create subscription",
                 "parameters": [
                     {
-                        "description": "Данные подписки / Subscription data",
+                        "description": "Subscription info",
                         "name": "input",
                         "in": "body",
                         "required": true,
@@ -104,7 +97,7 @@
                 ],
                 "responses": {
                     "201": {
-                        "description": "id новой записи",
+                        "description": "Created",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -114,13 +107,13 @@
                         }
                     },
                     "400": {
-                        "description": "Ошибка валидации / Validation error",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "string"
                         }
                     },
                     "409": {
-                        "description": "Подписка уже существует / Subscription already exists",
+                        "description": "Conflict",
                         "schema": {
                             "type": "string"
                         }
@@ -130,43 +123,38 @@
         },
         "/subscriptions/total": {
             "get": {
-                "description": "Рассчитывает общую стоимость подписок за указанный период. Если указано service_name, расчет только для этого сервиса / Calculates total cost of subscriptions for specified period",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "subscriptions"
                 ],
-                "summary": "Суммарная стоимость / Total cost",
+                "summary": "Calculate total cost",
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "description": "UUID пользователя",
+                        "description": "User UUID",
                         "name": "user_id",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "example": "01-2026",
-                        "description": "Начало периода (MM-YYYY)",
+                        "description": "Start date (MM-YYYY)",
                         "name": "from",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "example": "12-2026",
-                        "description": "Конец периода (MM-YYYY)",
+                        "description": "End date (MM-YYYY)",
                         "name": "to",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "example": "Spotify Premium",
-                        "description": "Название сервиса (опционально)",
+                        "description": "Service filter(не обязатльно)",
                         "name": "service_name",
                         "in": "query"
                     }
@@ -179,7 +167,7 @@
                         }
                     },
                     "400": {
-                        "description": "Неверный формат даты или параметров",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "string"
                         }
@@ -189,18 +177,17 @@
         },
         "/subscriptions/{id}": {
             "get": {
-                "description": "Получение данных подписки по её ID / Get subscription details by ID",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "subscriptions"
                 ],
-                "summary": "Получить подписку / Get subscription",
+                "summary": "Get subscription details",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "ID подписки / Subscription ID",
+                        "description": "Subscription ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -214,7 +201,7 @@
                         }
                     },
                     "404": {
-                        "description": "Не найдено / Not found",
+                        "description": "Not Found",
                         "schema": {
                             "type": "string"
                         }
@@ -222,18 +209,14 @@
                 }
             },
             "delete": {
-                "description": "Удаляет запись о подписке по ID / Deletes subscription record by ID",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "subscriptions"
                 ],
-                "summary": "Удалить подписку / Delete subscription",
+                "summary": "Delete subscription",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "ID подписки",
+                        "description": "Subscription ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -241,7 +224,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "status: deleted",
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -250,7 +233,7 @@
                         }
                     },
                     "404": {
-                        "description": "Не найдено / Not found",
+                        "description": "Not Found",
                         "schema": {
                             "type": "string"
                         }
@@ -260,7 +243,6 @@
         },
         "/subscriptions/{id}/extend": {
             "put": {
-                "description": "Обновляет дату окончания и цену существующей подписки / Updates end date and price of existing subscription",
                 "consumes": [
                     "application/json"
                 ],
@@ -270,18 +252,17 @@
                 "tags": [
                     "subscriptions"
                 ],
-                "summary": "Продлить подписку / Extend subscription",
+                "summary": "Extend subscription",
                 "parameters": [
                     {
                         "type": "integer",
-                        "example": 1,
-                        "description": "ID подписки",
+                        "description": "Subscription ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Новые данные",
+                        "description": "New data",
                         "name": "input",
                         "in": "body",
                         "required": true,
@@ -292,7 +273,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "status: success",
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -301,13 +282,13 @@
                         }
                     },
                     "400": {
-                        "description": "Неверные данные или дата",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "string"
                         }
                     },
                     "404": {
-                        "description": "Подписка не найдена",
+                        "description": "Not Found",
                         "schema": {
                             "type": "string"
                         }
