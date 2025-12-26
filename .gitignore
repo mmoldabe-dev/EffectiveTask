@@ -1,0 +1,10 @@
+.env
+
+.exe
+
+.idea/
+
+
+.vscode/
+
+./config.yaml
