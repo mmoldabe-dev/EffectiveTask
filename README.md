@@ -51,7 +51,8 @@ Swagger UI: **http://localhost:8080/swagger/index.html**
 ---
 
 ## Примеры использования
-
+[Ссылка на Postman колекцию](
+https://mmoldabe.postman.co/workspace/mmoldabe's-Workspace~1b088653-c10e-4e7c-82ef-cfda7dbe17a5/collection/43867812-4f31fca1-910e-4dd0-b6fb-457da0c99fe1?action=share&creator=43867812&active-environment=43867812-ec333e4b-6914-4534-92ad-cc98cf1a30c8)
 ### *Создать подписку*
 
 ```bash
@@ -274,3 +275,4 @@ LOG_LEVEL=debug
 
 ---
 
+### P.S. : При разработке статистики я реализовал комбинированный подход. Система считает расходы на основе текущих данных, но также поддерживает расчет на будущие периоды, если подписки активны. Просто не мог опредлиться как правильнее будет
