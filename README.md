@@ -27,9 +27,9 @@ REST API для управления подписками пользовател
 1. Клонируем репозиторий и переходим в директорию:
 
 
-```bash git clone <repo>```
+``` git clone <https://github.com/mmoldabe-dev/EffectiveTask>```
 
-```bash cd EffectiveTask```
+```cd EffectiveTask```
 
 
 # Копируем и настраиваем .env:
