@@ -48,15 +48,23 @@ func (h *HandlerSubscription) SetupRouter() http.Handler {
 	return handler
 }
 
-// @Summary Создать подписку / Create subscription
-// @Description Добавляет новую запись о подписке пользователя / Adds a new subscription record
+
+type CreateSubscriptionRequest struct {
+	UserID      uuid.UUID `json:"user_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ServiceName string    `json:"service_name" example:"Spotify Premium"`
+	Price       int       `json:"price" example:"500"`
+	StartDate   string    `json:"start_date" example:"01-2026"`
+	EndDate     *string   `json:"end_date,omitempty" example:"12-2026"`
+}
+
+// @Summary  Create subscription
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param input body domain.Subscription true "Данные подписки / Subscription data"
-// @Success 201 {object} map[string]int64 "id новой записи"
-// @Failure 400 {string} string "Ошибка валидации / Validation error"
-// @Failure 409 {string} string "Подписка уже существует / Subscription already exists"
+// @Param input body CreateSubscriptionRequest true Subscription data"
+// @Success 201 {object} map[string]int64 "id"
+// @Failure 400 {string} string " Validation error"
+// @Failure 409 {string} string "Subscription already exists"
 // @Router /subscriptions [post]
 func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.Request) {
 	var input domain.Subscription
@@ -123,13 +131,13 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(map[string]int64{"id": id})
 }
 
-// @Summary Получить подписку / Get subscription
-// @Description Получение данных подписки по её ID / Get subscription details by ID
+// @Summary Get subscription
+
 // @Tags subscriptions
 // @Produce json
-// @Param id path int true "ID подписки / Subscription ID"
+// @Param id path int true "Subscription ID"
 // @Success 200 {object} domain.Subscription
-// @Failure 404 {string} string "Не найдено / Not found"
+// @Failure 404 {string} string "Not found"
 // @Router /subscriptions/{id} [get]
 func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
@@ -151,13 +159,12 @@ func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(sub)
 }
 
-// @Summary Удалить подписку / Delete subscription
-// @Description Удаляет запись о подписке по ID / Deletes subscription record by ID
+// @Summary  Delete subscription
 // @Tags subscriptions
 // @Produce json
-// @Param id path int true "ID подписки"
+// @Param id path int true 
 // @Success 200 {object} map[string]string "status: deleted"
-// @Failure 404 {string} string "Не найдено / Not found"
+// @Failure 404 {string} string " Not found"
 // @Router /subscriptions/{id} [delete]
 func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
@@ -178,16 +185,18 @@ func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 }
 
-// @Summary Список подписок / List subscriptions
-// @Description Получить список подписок пользователя с фильтрами / Get user subscriptions with filters
+// @Summary List subscriptions
+
+// @Tags subscriptions
 // @Produce json
-// @Param user_id query string true "UUID пользователя" example(550e8400-e29b-41d4-a716-446655440000)
-// @Param service_name query string false "Название сервиса"
-// @Param limit query int false "Лимит" example(5)
-// @Param offset query int false "Смещение" example(3)
-// @Param min_price query int false "Мин. цена" example(1000)
-// @Param max_price query int false "Макс. цена" example(1300)
+// @Param user_id query string true "UUID " example(550e8400-e29b-41d4-a716-446655440000)
+// @Param service_name query string false 
+// @Param limit query int false  example(5)
+// @Param offset query int false  example(0)
+// @Param min_price query int false  example(1000)
+// @Param max_price query int false  example(1300)
 // @Success 200 {array} domain.Subscription
+// @Failure 400 {string} string 
 // @Router /subscriptions [get]
 func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -250,14 +259,23 @@ func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(subs)
 }
 
-// @Summary Суммарная стоимость / Total cost
+
+type TotalCostResponse struct {
+	TotalCost int64             `json:"total_cost" example:"6000"`
+	Details   []string          `json:"details" example:"Spotify Premium: 6000"`
+	Period    map[string]string `json:"period"`
+	Warning   string            `json:"warning,omitempty"`
+}
+
+// @Summary Total cost
 // @Tags subscriptions
 // @Produce json
-// @Param user_id query string true "UUID пользователя" example(550e8400-e29b-41d4-a716-446655440000)
-// @Param from query string true "Начало (MM-YYYY)" example(01-2026)
-// @Param to query string true "Конец (MM-YYYY)" example(12-2026)
-// @Param service_name query string false "Название сервиса"
-// @Success 200 {object} map[string]interface{} "Пример: {total_cost: 30000, details: [...]}"
+// @Param user_id query string true "UUID" example(550e8400-e29b-41d4-a716-446655440000)
+// @Param from query string true "(MM-YYYY)" example(01-2026)
+// @Param to query string true "(MM-YYYY)" example(12-2026)
+// @Param service_name query string false "(опционально)" example(Spotify Premium)
+// @Success 200 {object} TotalCostResponse
+// @Failure 400 {string} string 
 // @Router /subscriptions/total [get]
 func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("user_id")
@@ -312,13 +330,16 @@ type ExtendInput struct {
 	Price   int    `json:"price" example:"600"`
 }
 
-// @Summary Продлить подписку / Extend subscription
+// @Summary Extend subscription
+
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param id path int true "ID подписки" example(1)
-// @Param input body ExtendInput true "Новые данные"
-// @Success 200 {object} map[string]string "example: {status: success}"
+// @Param id path int true  example(1)
+// @Param input body ExtendInput true
+// @Success 200 {object} map[string]string "status: success"
+// @Failure 400 {string} string "Неверные данные или дата"
+// @Failure 404 {string} string "Подписка не найдена"
 // @Router /subscriptions/{id}/extend [put]
 func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")

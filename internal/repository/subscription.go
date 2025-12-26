@@ -174,7 +174,7 @@ func (r *SubscriptionRepository) List(ctx context.Context, userID uuid.UUID, fil
 	return subs, nil
 }
 
-// подсчета суммарной стоимости всех подписок за период
+
 func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, from, to time.Time) ([]domain.Subscription, error) {
 	const op = "repository.postgres.GetForPeriod"
 

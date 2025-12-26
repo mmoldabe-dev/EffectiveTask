@@ -21,6 +21,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "subscriptions"
+                ],
                 "summary": "Список подписок / List subscriptions",
                 "parameters": [
                     {
@@ -40,28 +43,28 @@ const docTemplate = `{
                     {
                         "type": "integer",
                         "example": 5,
-                        "description": "Лимит",
+                        "description": "Лимит (по умолчанию 10, максимум 200)",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "example": 3,
-                        "description": "Смещение",
+                        "example": 0,
+                        "description": "Смещение (по умолчанию 0)",
                         "name": "offset",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "example": 1000,
-                        "description": "Мин. цена",
+                        "description": "Минимальная цена",
                         "name": "min_price",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "example": 1300,
-                        "description": "Макс. цена",
+                        "description": "Максимальная цена",
                         "name": "max_price",
                         "in": "query"
                     }
@@ -74,6 +77,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/domain.Subscription"
                             }
+                        }
+                    },
+                    "400": {
+                        "description": "Неверные параметры запроса",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 }
@@ -97,7 +106,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/domain.Subscription"
+                            "$ref": "#/definitions/handler.CreateSubscriptionRequest"
                         }
                     }
                 ],
@@ -129,6 +138,7 @@ const docTemplate = `{
         },
         "/subscriptions/total": {
             "get": {
+                "description": "Рассчитывает общую стоимость подписок за указанный период. Если указано service_name, расчет только для этого сервиса / Calculates total cost of subscriptions for specified period",
                 "produces": [
                     "application/json"
                 ],
@@ -148,7 +158,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "01-2026",
-                        "description": "Начало (MM-YYYY)",
+                        "description": "Начало периода (MM-YYYY)",
                         "name": "from",
                         "in": "query",
                         "required": true
@@ -156,24 +166,30 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "12-2026",
-                        "description": "Конец (MM-YYYY)",
+                        "description": "Конец периода (MM-YYYY)",
                         "name": "to",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Название сервиса",
+                        "example": "Spotify Premium",
+                        "description": "Название сервиса (опционально)",
                         "name": "service_name",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Пример: {total_cost: 30000, details: [...]}",
+                        "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handler.TotalCostResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный формат даты или параметров",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 }
@@ -252,6 +268,7 @@ const docTemplate = `{
         },
         "/subscriptions/{id}/extend": {
             "put": {
+                "description": "Обновляет дату окончания и цену существующей подписки / Updates end date and price of existing subscription",
                 "consumes": [
                     "application/json"
                 ],
@@ -283,12 +300,24 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "example: {status: success}",
+                        "description": "status: success",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    },
+                    "400": {
+                        "description": "Неверные данные или дата",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Подписка не найдена",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 }
@@ -325,6 +354,31 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.CreateSubscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "end_date": {
+                    "type": "string",
+                    "example": "12-2026"
+                },
+                "price": {
+                    "type": "integer",
+                    "example": 500
+                },
+                "service_name": {
+                    "type": "string",
+                    "example": "Spotify Premium"
+                },
+                "start_date": {
+                    "type": "string",
+                    "example": "01-2026"
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
         "handler.ExtendInput": {
             "type": "object",
             "properties": {
@@ -335,6 +389,33 @@ const docTemplate = `{
                 "price": {
                     "type": "integer",
                     "example": 600
+                }
+            }
+        },
+        "handler.TotalCostResponse": {
+            "type": "object",
+            "properties": {
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "Spotify Premium: 6000"
+                    ]
+                },
+                "period": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "total_cost": {
+                    "type": "integer",
+                    "example": 6000
+                },
+                "warning": {
+                    "type": "string"
                 }
             }
         }
