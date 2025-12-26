@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	_ "github.com/mmoldabe-dev/EffectiveTask/docs"
 	"github.com/mmoldabe-dev/EffectiveTask/internal/domain"
 	"github.com/mmoldabe-dev/EffectiveTask/internal/middleware"
 	"github.com/mmoldabe-dev/EffectiveTask/internal/service"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 type HandlerSubscription struct {
@@ -36,6 +38,7 @@ func (h *HandlerSubscription) SetupRouter() http.Handler {
 	mux.HandleFunc("GET /subscriptions", h.listSubscription)
 	mux.HandleFunc("GET /subscriptions/total", h.getTotalCost)
 	mux.HandleFunc("PUT /subscriptions/{id}/extend", h.extendSubscription)
+	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	var handler http.Handler = mux
 	handler = middleware.JSONMiddleware(handler)
@@ -45,6 +48,16 @@ func (h *HandlerSubscription) SetupRouter() http.Handler {
 	return handler
 }
 
+// @Summary Создать подписку / Create subscription
+// @Description Добавляет новую запись о подписке пользователя / Adds a new subscription record
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param input body domain.Subscription true "Данные подписки / Subscription data"
+// @Success 201 {object} map[string]int64 "id новой записи"
+// @Failure 400 {string} string "Ошибка валидации / Validation error"
+// @Failure 409 {string} string "Подписка уже существует / Subscription already exists"
+// @Router /subscriptions [post]
 func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.Request) {
 	var input domain.Subscription
 
@@ -110,6 +123,14 @@ func (h *HandlerSubscription) createSubscription(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(map[string]int64{"id": id})
 }
 
+// @Summary Получить подписку / Get subscription
+// @Description Получение данных подписки по её ID / Get subscription details by ID
+// @Tags subscriptions
+// @Produce json
+// @Param id path int true "ID подписки / Subscription ID"
+// @Success 200 {object} domain.Subscription
+// @Failure 404 {string} string "Не найдено / Not found"
+// @Router /subscriptions/{id} [get]
 func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)
@@ -130,6 +151,14 @@ func (h *HandlerSubscription) getSubscription(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(sub)
 }
 
+// @Summary Удалить подписку / Delete subscription
+// @Description Удаляет запись о подписке по ID / Deletes subscription record by ID
+// @Tags subscriptions
+// @Produce json
+// @Param id path int true "ID подписки"
+// @Success 200 {object} map[string]string "status: deleted"
+// @Failure 404 {string} string "Не найдено / Not found"
+// @Router /subscriptions/{id} [delete]
 func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)
@@ -149,6 +178,19 @@ func (h *HandlerSubscription) deleteSubscription(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 }
 
+// @Summary Список подписок / List subscriptions
+// @Description Получить список подписок пользователя с фильтрами / Get user subscriptions with filters
+// @Tags subscriptions
+// @Produce json
+// @Param user_id query string true "UUID пользователя"
+// @Param service_name query string false "Название сервиса"
+// @Param limit query int false "Лимит записей (default 10)"
+// @Param offset query int false "Смещение"
+// @Param min_price query int false "Минимальная цена"
+// @Param max_price query int false "Максимальная цена"
+// @Success 200 {array} domain.Subscription
+// @Failure 400 {string} string "Ошибка параметров / Invalid params"
+// @Router /subscriptions [get]
 func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
@@ -210,6 +252,17 @@ func (h *HandlerSubscription) listSubscription(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(subs)
 }
 
+// @Summary Суммарная стоимость / Total cost
+// @Description Подсчет стоимости за период с детализацией / Calculate total cost for period with details
+// @Tags subscriptions
+// @Produce json
+// @Param user_id query string true "UUID пользователя"
+// @Param from query string true "Начало периода (MM-YYYY)"
+// @Param to query string true "Конец периода (MM-YYYY)"
+// @Param service_name query string false "Название сервиса"
+// @Success 200 {object} map[string]interface{} "total_cost, details, period"
+// @Failure 400 {string} string "Ошибка дат / Invalid dates"
+// @Router /subscriptions/total [get]
 func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("user_id")
 	serviceName := r.URL.Query().Get("service_name")
@@ -227,7 +280,7 @@ func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	total, err := h.services.GetTotalCost(r.Context(), userID, serviceName, fromStr, toStr)
+	total, details, err := h.services.GetTotalCost(r.Context(), userID, serviceName, fromStr, toStr)
 	if err != nil {
 		h.log.Error("failed to calculate total cost", slog.String("error", err.Error()))
 		http.Error(w, "failed to calculate cost", http.StatusBadRequest)
@@ -236,13 +289,13 @@ func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Reques
 
 	response := map[string]interface{}{
 		"total_cost": total,
+		"details":    details,
 		"period": map[string]string{
 			"from": fromStr,
 			"to":   toStr,
 		},
 	}
 
-	// Добавляем предупреждение, если период включает будущие даты
 	if toStr != "" {
 		toDate, parseErr := time.Parse("01-2006", toStr)
 		if parseErr == nil {
@@ -258,6 +311,16 @@ func (h *HandlerSubscription) getTotalCost(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(response)
 }
 
+// @Summary Продлить подписку / Extend subscription
+// @Description Обновить дату окончания и цену существующей подписки / Update end date and price
+// @Tags subscriptions
+// @Accept json
+// @Produce json
+// @Param id path int true "ID подписки"
+// @Param input body object true "Новая дата и цена / New date and price"
+// @Success 200 {object} map[string]string "status: success"
+// @Failure 404 {string} string "Не найдено / Not found"
+// @Router /subscriptions/{id}/extend [put]
 func (h *HandlerSubscription) extendSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := parseID(idStr)

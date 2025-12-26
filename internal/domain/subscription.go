@@ -7,14 +7,14 @@ import (
 )
 
 type Subscription struct {
-	ID          int64      `json:"id" db:"id"`
-	ServiceName string     `json:"service_name" db:"service_name"`
-	Price       int        `json:"price" db:"price"`
-	UserID      uuid.UUID  `json:"user_id" db:"user_id"`
-	StartDate   string  `json:"start_date" db:"start_date"`
-	EndDate     *string `json:"end_date,omitempty" db:"end_date"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+    ID          int64     `json:"id" example:"10"`
+    UserID      uuid.UUID `json:"user_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+    ServiceName string    `json:"service_name" example:"Spotify Premium"`
+    Price       int       `json:"price" example:"500"`
+    StartDate   string    `json:"start_date" example:"01-2026"`
+    EndDate     *string   `json:"end_date,omitempty" example:"12-2026"`
+    CreatedAt   time.Time `json:"created_at,omitempty"`
+    UpdatedAt   time.Time `json:"updated_at,omitempty"`
 }
 
 type SubscriptionFilter struct {

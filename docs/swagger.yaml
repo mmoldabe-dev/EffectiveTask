@@ -1,0 +1,228 @@
+definitions:
+  domain.Subscription:
+    properties:
+      created_at:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: integer
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: The test task for "effective mobile"
+  title: Effective Task
+  version: "1.0"
+paths:
+  /subscriptions:
+    get:
+      description: Получить список подписок пользователя с фильтрами / Get user subscriptions
+        with filters
+      parameters:
+      - description: UUID пользователя
+        in: query
+        name: user_id
+        required: true
+        type: string
+      - description: Название сервиса
+        in: query
+        name: service_name
+        type: string
+      - description: Лимит записей (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Смещение
+        in: query
+        name: offset
+        type: integer
+      - description: Минимальная цена
+        in: query
+        name: min_price
+        type: integer
+      - description: Максимальная цена
+        in: query
+        name: max_price
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Subscription'
+            type: array
+        "400":
+          description: Ошибка параметров / Invalid params
+          schema:
+            type: string
+      summary: Список подписок / List subscriptions
+      tags:
+      - subscriptions
+    post:
+      consumes:
+      - application/json
+      description: Добавляет новую запись о подписке пользователя / Adds a new subscription
+        record
+      parameters:
+      - description: Данные подписки / Subscription data
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/domain.Subscription'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: id новой записи
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "400":
+          description: Ошибка валидации / Validation error
+          schema:
+            type: string
+        "409":
+          description: Подписка уже существует / Subscription already exists
+          schema:
+            type: string
+      summary: Создать подписку / Create subscription
+      tags:
+      - subscriptions
+  /subscriptions/{id}:
+    delete:
+      description: Удаляет запись о подписке по ID / Deletes subscription record by
+        ID
+      parameters:
+      - description: ID подписки
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'status: deleted'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Не найдено / Not found
+          schema:
+            type: string
+      summary: Удалить подписку / Delete subscription
+      tags:
+      - subscriptions
+    get:
+      description: Получение данных подписки по её ID / Get subscription details by
+        ID
+      parameters:
+      - description: ID подписки / Subscription ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Subscription'
+        "404":
+          description: Не найдено / Not found
+          schema:
+            type: string
+      summary: Получить подписку / Get subscription
+      tags:
+      - subscriptions
+  /subscriptions/{id}/extend:
+    put:
+      consumes:
+      - application/json
+      description: Обновить дату окончания и цену существующей подписки / Update end
+        date and price
+      parameters:
+      - description: ID подписки
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Новая дата и цена / New date and price
+        in: body
+        name: input
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'status: success'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Не найдено / Not found
+          schema:
+            type: string
+      summary: Продлить подписку / Extend subscription
+      tags:
+      - subscriptions
+  /subscriptions/total:
+    get:
+      description: Подсчет стоимости за период с детализацией / Calculate total cost
+        for period with details
+      parameters:
+      - description: UUID пользователя
+        in: query
+        name: user_id
+        required: true
+        type: string
+      - description: Начало периода (MM-YYYY)
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: Конец периода (MM-YYYY)
+        in: query
+        name: to
+        required: true
+        type: string
+      - description: Название сервиса
+        in: query
+        name: service_name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: total_cost, details, period
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Ошибка дат / Invalid dates
+          schema:
+            type: string
+      summary: Суммарная стоимость / Total cost
+      tags:
+      - subscriptions
+swagger: "2.0"

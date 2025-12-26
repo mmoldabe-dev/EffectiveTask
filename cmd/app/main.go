@@ -17,7 +17,12 @@ import (
 	"github.com/mmoldabe-dev/EffectiveTask/internal/storage/postgres"
 	"github.com/mmoldabe-dev/EffectiveTask/pkg/logger"
 )
+//@title Effective Task
+//@version 1.0
+//@description The test task for "effective mobile"
 
+//host@ localhost:8080
+//basePath /
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {

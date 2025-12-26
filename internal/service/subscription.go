@@ -20,7 +20,7 @@ type SubscriptionServiceInterface interface {
 	GetByID(ctx context.Context, id int64) (*domain.Subscription, error)
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
-	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, fromStr, toStr string) (int64, error)
+	GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, fromStr, toStr string) (int64, []string, error)
 	Extend(ctx context.Context, id int64, newEndDateStr string, newPrice int) error
 }
 
@@ -97,26 +97,26 @@ func (s *SubscriptionService) List(ctx context.Context, userID uuid.UUID, filter
 
 	return subs, nil
 }
-func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, fromStr, toStr string) (int64, error) {
+func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, fromStr, toStr string) (int64, []string, error) {
 	const op = "service.Subscription.GetTotalCost"
 	layout := "01-2006"
 
 	reqFrom, err := time.Parse(layout, fromStr)
 	if err != nil {
-		return 0, fmt.Errorf("invalid from date")
+		return 0, nil, fmt.Errorf("invalid from date")
 	}
 	reqTo, err := time.Parse(layout, toStr)
 	if err != nil {
-		return 0, fmt.Errorf("invalid to date")
+		return 0, nil, fmt.Errorf("invalid to date")
 	}
 
 	subs, err := s.repo.GetTotalCost(ctx, userID, serviceName, reqFrom, reqTo)
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return 0, nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	var totalCost int64
-
+	var details []string
 	for _, sub := range subs {
 		subStart, _ := time.Parse(layout, sub.StartDate)
 
@@ -133,11 +133,14 @@ func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID
 		months := countMonths(intersectStart, intersectEnd)
 
 		if months > 0 {
-			totalCost += int64(sub.Price) * int64(months)
+			cost := int64(sub.Price) * int64(months)
+			totalCost += cost
+
+			details = append(details, fmt.Sprintf("%s: %d", sub.ServiceName, cost))
 		}
 	}
 
-	return totalCost, nil
+	return totalCost, details, nil
 }
 
 var monthYearRegex = regexp.MustCompile(`^(0[1-9]|1[0-2])-\d{4}$`)

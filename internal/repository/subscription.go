@@ -179,7 +179,7 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.U
 	const op = "repository.postgres.GetForPeriod"
 
 	query := `
-        SELECT price, start_date, end_date 
+        SELECT service_name,price, start_date, end_date
         FROM subscriptions 
         WHERE user_id = $1 
           AND TO_DATE(start_date, 'MM-YYYY') <= $3
@@ -200,7 +200,7 @@ func (r *SubscriptionRepository) GetTotalCost(ctx context.Context, userID uuid.U
 	var subs []domain.Subscription
 	for rows.Next() {
 		var s domain.Subscription
-		if err := rows.Scan(&s.Price, &s.StartDate, &s.EndDate); err != nil {
+		if err := rows.Scan(&s.ServiceName, &s.Price, &s.StartDate, &s.EndDate); err != nil {
 			return nil, err
 		}
 		subs = append(subs, s)
