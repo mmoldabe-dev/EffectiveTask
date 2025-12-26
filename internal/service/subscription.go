@@ -39,7 +39,7 @@ func NewSubscriptionService(repo repository.SubscriptionInterface, log *slog.Log
 }
 
 func (s *SubscriptionService) Create(ctx context.Context, sub domain.Subscription) (int64, error) {
-	const op = "service.Subscription.Create"
+	const op = "service Create"
 
 	if sub.Price < 0 {
 		return 0, fmt.Errorf("op:%s, price must be positive", op)
@@ -64,7 +64,7 @@ func (s *SubscriptionService) Create(ctx context.Context, sub domain.Subscriptio
 }
 
 func (s *SubscriptionService) GetByID(ctx context.Context, id int64) (*domain.Subscription, error) {
-	const op = "service.Subscription.GetByID"
+	const op = "service GetByID"
 
 	sub, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *SubscriptionService) GetByID(ctx context.Context, id int64) (*domain.Su
 }
 
 func (s *SubscriptionService) Delete(ctx context.Context, id int64) error {
-	const op = "service.Subscription.Delete"
+	const op = "service Delete"
 
 	if err := s.repo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("%s, %w", op, err)
@@ -84,7 +84,7 @@ func (s *SubscriptionService) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 func (s *SubscriptionService) List(ctx context.Context, userID uuid.UUID, filter domain.SubscriptionFilter) ([]domain.Subscription, error) {
-	const op = "service.Subscription.List"
+	const op = "service List"
 
 	if filter.MinPrice > 0 && filter.MaxPrice > 0 && filter.MinPrice > filter.MaxPrice {
 		return nil, fmt.Errorf("minimum price cannot be greater than maximum price")
@@ -98,7 +98,7 @@ func (s *SubscriptionService) List(ctx context.Context, userID uuid.UUID, filter
 	return subs, nil
 }
 func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID, serviceName string, fromStr, toStr string) (int64, []string, error) {
-	const op = "service.Subscription.GetTotalCost"
+	const op = "service GetTotalCost"
 	layout := "01-2006"
 
 	reqFrom, err := time.Parse(layout, fromStr)
@@ -146,7 +146,7 @@ func (s *SubscriptionService) GetTotalCost(ctx context.Context, userID uuid.UUID
 var monthYearRegex = regexp.MustCompile(`^(0[1-9]|1[0-2])-\d{4}$`)
 
 func (s *SubscriptionService) Extend(ctx context.Context, id int64, newEndDateStr string, newPrice int) error {
-	const op = "service.Subscription.Extend"
+	const op = "service Extend"
 
 	if !monthYearRegex.MatchString(newEndDateStr) {
 		return fmt.Errorf("%s: invalid date format", op)
